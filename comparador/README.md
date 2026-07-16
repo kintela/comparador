@@ -1,4 +1,24 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Comparador de precios
+
+Aplicación Next.js para rastrear y comparar precios de supermercados.
+
+## Panel de rastreo
+
+El rastreo manual de Eroski está disponible en:
+
+```text
+http://localhost:3000/admin/rastreo
+```
+
+Antes de usarlo, añade a `.env.local` una clave aleatoria de al menos 16 caracteres:
+
+```bash
+ADMIN_RASTREO_TOKEN=pon-aqui-una-clave-larga-y-aleatoria
+```
+
+En producción, configura la misma variable en Vercel. La previsualización no escribe
+en Supabase; la opción **Rastrear y guardar** inserta productos nuevos y añade precios
+al histórico.
 
 ## Getting Started
 
