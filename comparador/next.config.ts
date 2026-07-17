@@ -33,6 +33,11 @@ const nextConfig: NextConfig = {
         hostname: "www.lidl.es",
         pathname: "/assets/**",
       },
+      {
+        protocol: "https",
+        hostname: "www.compraonline.alcampo.es",
+        pathname: "/images-v3/**",
+      },
     ],
   },
 };

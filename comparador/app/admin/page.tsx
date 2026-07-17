@@ -37,6 +37,12 @@ const RASTREADORES = [
     href: "/admin/rastreo/lidl",
     color: "border-blue-500/40 hover:border-blue-400",
   },
+  {
+    nombre: "Alcampo",
+    descripcion: "Catálogo oficial Alcampo Online, precios y ofertas de folleto.",
+    href: "/admin/rastreo/alcampo",
+    color: "border-orange-500/40 hover:border-orange-400",
+  },
 ];
 
 export default function PaginaAdmin() {
