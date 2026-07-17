@@ -18,6 +18,11 @@ const nextConfig: NextConfig = {
         hostname: "prod-mercadona.imgix.net",
         pathname: "/images/**",
       },
+      {
+        protocol: "https",
+        hostname: "s7g10.scene7.com",
+        pathname: "/is/image/aldinord/**",
+      },
     ],
   },
 };

@@ -19,6 +19,12 @@ const RASTREADORES = [
     href: "/admin/rastreo/mercadona",
     color: "border-emerald-500/40 hover:border-emerald-400",
   },
+  {
+    nombre: "ALDI",
+    descripcion: "Catálogo web de Península y ofertas semanales.",
+    href: "/admin/rastreo/aldi",
+    color: "border-cyan-500/40 hover:border-cyan-400",
+  },
 ];
 
 export default function PaginaAdmin() {
