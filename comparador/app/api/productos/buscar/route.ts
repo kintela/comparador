@@ -20,6 +20,8 @@ type ProductoSupermercadoDb = {
 type PrecioDb = {
   producto_supermercado_id: string;
   precio: number;
+  precio_promocional: number | null;
+  texto_promocion: string | null;
   disponible: boolean;
   fecha_obtencion: string;
   tiendas: {
@@ -52,7 +54,7 @@ export async function GET(request: Request) {
       )
       .ilike("nombre_original", `%${consulta}%`)
       .eq("activo", true)
-      .limit(30);
+      .limit(60);
 
     if (error) throw error;
 
@@ -65,7 +67,7 @@ export async function GET(request: Request) {
     const { data: datosPrecios, error: errorPrecios } = await supabase
       .from("precios")
       .select(
-        "producto_supermercado_id, precio, disponible, fecha_obtencion, tiendas(id, nombre, municipio)",
+        "producto_supermercado_id, precio, precio_promocional, texto_promocion, disponible, fecha_obtencion, tiendas(id, nombre, municipio)",
       )
       .in("producto_supermercado_id", ids)
       .order("fecha_obtencion", { ascending: false });
@@ -91,6 +93,8 @@ export async function GET(request: Request) {
           tienda: string;
           municipio: string | null;
           precio: number;
+          precioOriginal: number | null;
+          textoPromocion: string | null;
           disponible: boolean;
           fechaObtencion: string;
           urlProducto: string | null;
@@ -115,7 +119,9 @@ export async function GET(request: Request) {
           supermercado: producto.cadenas_supermercados?.nombre ?? "Supermercado",
           tienda: precio.tiendas?.nombre ?? "Tienda online",
           municipio: precio.tiendas?.municipio ?? null,
-          precio: Number(precio.precio),
+          precio: Number(precio.precio_promocional ?? precio.precio),
+          precioOriginal: precio.precio_promocional ? Number(precio.precio) : null,
+          textoPromocion: precio.texto_promocion,
           disponible: precio.disponible,
           fechaObtencion: precio.fecha_obtencion,
           urlProducto: producto.url_producto,

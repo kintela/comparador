@@ -1,5 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
-
+import { autorizarAdmin } from "@/servicios/admin/autorizacion";
 import { rastrearProductosEroski } from "@/servicios/eroski/cliente-eroski";
 import { guardarRastreoEroski } from "@/servicios/eroski/persistencia-eroski";
 import { rastrearLoteEroski } from "@/servicios/eroski/rastreo-lote";
@@ -13,27 +12,6 @@ type SolicitudRastreo = {
   maxProductos?: unknown;
   guardar?: unknown;
 };
-
-function autorizar(request: Request): Response | null {
-  const esperado = process.env.ADMIN_RASTREO_TOKEN?.trim();
-  if (!esperado || esperado.length < 16) {
-    return Response.json(
-      { ok: false, error: "ADMIN_RASTREO_TOKEN no está configurado en el servidor" },
-      { status: 503 },
-    );
-  }
-
-  const recibido = request.headers.get("x-admin-token") ?? "";
-  const bufferEsperado = Buffer.from(esperado);
-  const bufferRecibido = Buffer.from(recibido);
-  const valido =
-    bufferEsperado.length === bufferRecibido.length &&
-    timingSafeEqual(bufferEsperado, bufferRecibido);
-
-  return valido
-    ? null
-    : Response.json({ ok: false, error: "No autorizado" }, { status: 401 });
-}
 
 function enteroAcotado(
   valor: string | null,
@@ -49,7 +27,7 @@ function enteroAcotado(
 }
 
 export async function GET(request: Request) {
-  const respuestaAutorizacion = autorizar(request);
+  const respuestaAutorizacion = autorizarAdmin(request);
   if (respuestaAutorizacion) return respuestaAutorizacion;
 
   const parametros = new URL(request.url).searchParams;
@@ -93,7 +71,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const respuestaAutorizacion = autorizar(request);
+  const respuestaAutorizacion = autorizarAdmin(request);
   if (respuestaAutorizacion) return respuestaAutorizacion;
 
   let cuerpo: SolicitudRastreo;

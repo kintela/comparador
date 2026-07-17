@@ -8,6 +8,8 @@ type Oferta = {
   tienda: string;
   municipio: string | null;
   precio: number;
+  precioOriginal: number | null;
+  textoPromocion: string | null;
   disponible: boolean;
   fechaObtencion: string;
   urlProducto: string | null;
@@ -166,58 +168,96 @@ function Cargando() {
 }
 
 function ProductoCard({ producto }: { producto: Producto }) {
-  const mejorOferta = [...producto.ofertas].sort((a, b) => a.precio - b.precio)[0];
+  const ofertas = [...producto.ofertas].sort((a, b) => a.precio - b.precio);
 
   return (
-    <article className="flex min-h-56 gap-5 rounded-2xl border border-[#17352b]/10 bg-white p-5 shadow-[0_10px_35px_rgba(23,53,43,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_45px_rgba(23,53,43,0.1)]">
-      <div className="relative h-32 w-28 shrink-0 overflow-hidden rounded-xl bg-[#f7f5ee] sm:h-36 sm:w-32">
-        {producto.imagen ? (
-          <Image
-            src={producto.imagen}
-            alt={producto.nombre}
-            fill
-            sizes="128px"
-            className="object-contain p-2"
-          />
-        ) : (
-          <div className="grid h-full place-items-center text-3xl text-[#9eaaa5]">€</div>
-        )}
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-[#71837c]">
-          {producto.marca && <span>{producto.marca}</span>}
-          {producto.categoria && <span>· {producto.categoria}</span>}
-        </div>
-        <h3 className="mt-2 line-clamp-3 font-bold leading-5 text-[#17352b]">
-          {producto.nombre}
-        </h3>
-
-        <div className="mt-auto flex items-end justify-between gap-3 pt-4">
-          <div>
-            <p className="text-xs text-[#71837c]">En {mejorOferta.supermercado}</p>
-            <p className="mt-0.5 text-2xl font-extrabold text-[#176b50]">
-              {mejorOferta.precio.toLocaleString("es-ES", {
-                style: "currency",
-                currency: "EUR",
-              })}
-            </p>
-            <p className="mt-1 text-xs text-[#8b9994]">
-              {mejorOferta.tienda}
-              {mejorOferta.municipio ? ` · ${mejorOferta.municipio}` : ""}
-            </p>
-          </div>
-          {mejorOferta.urlProducto && (
-            <a
-              href={mejorOferta.urlProducto}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-lg border border-[#176b50]/25 px-3 py-2 text-xs font-bold text-[#176b50] transition hover:bg-[#176b50] hover:text-white"
-            >
-              Ver producto
-            </a>
+    <article className="rounded-2xl border border-[#17352b]/10 bg-white p-5 shadow-[0_10px_35px_rgba(23,53,43,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_45px_rgba(23,53,43,0.1)]">
+      <div className="flex gap-5">
+        <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-xl bg-[#f7f5ee] sm:h-32 sm:w-28">
+          {producto.imagen ? (
+            <Image
+              src={producto.imagen}
+              alt={producto.nombre}
+              fill
+              sizes="112px"
+              className="object-contain p-2"
+            />
+          ) : (
+            <div className="grid h-full place-items-center text-3xl text-[#9eaaa5]">€</div>
           )}
         </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-[#71837c]">
+            {producto.marca && <span>{producto.marca}</span>}
+            {producto.categoria && <span>· {producto.categoria}</span>}
+          </div>
+          <h3 className="mt-2 line-clamp-3 font-bold leading-5 text-[#17352b]">
+            {producto.nombre}
+          </h3>
+          <p className="mt-3 text-xs text-[#71837c]">
+            {ofertas.length > 1
+              ? `${ofertas.length} precios encontrados`
+              : "1 precio encontrado"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-2 border-t border-[#17352b]/10 pt-4">
+        {ofertas.map((oferta, indice) => (
+          <div
+            key={`${oferta.supermercado}-${oferta.tienda}`}
+            className="flex items-center justify-between gap-3 rounded-xl bg-[#f7f5ee] px-3 py-3"
+          >
+          <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-bold text-[#17352b]">{oferta.supermercado}</p>
+                {indice === 0 && ofertas.length > 1 && (
+                  <span className="rounded-full bg-[#dff3e9] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#176b50]">
+                    Mejor precio
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-xs text-[#71837c]">
+                {oferta.tienda}
+                {oferta.municipio ? ` · ${oferta.municipio}` : ""}
+              </p>
+              {oferta.textoPromocion && (
+                <p className="mt-1 text-xs font-semibold text-[#b06d00]">
+                  {oferta.textoPromocion}
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-3 text-right">
+              <div>
+                {oferta.precioOriginal && (
+                  <p className="text-xs text-[#8b9994] line-through">
+                    {oferta.precioOriginal.toLocaleString("es-ES", {
+                      style: "currency",
+                      currency: "EUR",
+                    })}
+                  </p>
+                )}
+                <p className="text-xl font-extrabold text-[#176b50]">
+                  {oferta.precio.toLocaleString("es-ES", {
+                  style: "currency",
+                  currency: "EUR",
+                })}
+                </p>
+              </div>
+              {oferta.urlProducto && (
+                <a
+                  href={oferta.urlProducto}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Ver en ${oferta.supermercado}`}
+                  className="grid size-8 place-items-center rounded-lg border border-[#176b50]/25 text-sm font-bold text-[#176b50] transition hover:bg-[#176b50] hover:text-white"
+                >
+                  ↗
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </article>
   );
