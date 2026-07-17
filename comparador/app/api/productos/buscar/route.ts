@@ -37,6 +37,14 @@ export async function GET(request: Request) {
   const parametros = new URL(request.url).searchParams;
   const consultaOriginal = parametros.get("q")?.trim() ?? "";
   const soloOfertas = ["1", "true"].includes(parametros.get("ofertas")?.toLowerCase() ?? "");
+  const supermercados = [
+    ...new Set(
+      parametros
+        .getAll("supermercado")
+        .map((nombre) => nombre.trim())
+        .filter((nombre) => nombre.length > 0 && nombre.length <= 60),
+    ),
+  ].slice(0, 20);
   const consulta = consultaOriginal
     .replace(/[^\p{L}\p{N}\s.,-]/gu, " ")
     .replace(/\s+/g, " ")
@@ -80,16 +88,42 @@ export async function GET(request: Request) {
           ok: true,
           consulta,
           soloOfertas,
+          supermercados,
           total: 0,
           productos: [],
         });
       }
     }
 
-    const consultaProductos = supabase
+    let consultaProductos = supabase
       .from("productos_supermercado")
       .select(seleccionProductos)
       .eq("activo", true);
+
+    if (supermercados.length > 0) {
+      const { data: cadenas, error: errorCadenas } = await supabase
+        .from("cadenas_supermercados")
+        .select("id")
+        .in("nombre", supermercados)
+        .eq("activa", true);
+      if (errorCadenas) throw errorCadenas;
+
+      const idsCadenas = (cadenas ?? []).map((cadena) => cadena.id);
+      if (idsCadenas.length === 0) {
+        return Response.json({
+          ok: true,
+          consulta,
+          soloOfertas,
+          supermercados,
+          total: 0,
+          productos: [],
+        });
+      }
+      consultaProductos = consultaProductos.in(
+        "cadena_supermercado_id",
+        idsCadenas,
+      );
+    }
 
     const { data, error } = consulta
       ? await consultaProductos.ilike("nombre_original", `%${consulta}%`).limit(120)
@@ -97,12 +131,14 @@ export async function GET(request: Request) {
 
     if (error) throw error;
 
-    const productosSupermercado = (data ?? []) as unknown as ProductoSupermercadoDb[];
+    const productosSupermercado =
+      (data ?? []) as unknown as ProductoSupermercadoDb[];
     if (productosSupermercado.length === 0) {
       return Response.json({
         ok: true,
         consulta,
         soloOfertas,
+        supermercados,
         total: 0,
         productos: [],
       });
@@ -206,6 +242,7 @@ export async function GET(request: Request) {
       ok: true,
       consulta,
       soloOfertas,
+      supermercados,
       total: productos.length,
       productos,
     });

@@ -29,12 +29,22 @@ type RespuestaBusqueda = {
   ok: boolean;
   consulta?: string;
   soloOfertas?: boolean;
+  supermercados?: string[];
   total?: number;
   productos?: Producto[];
   error?: string;
 };
 
-const BUSQUEDAS_POPULARES = ["leche", "huevos", "pan", "arroz", "aceite"];
+const SUPERMERCADOS = [
+  "Alcampo",
+  "ALDI",
+  "BM Supermercados",
+  "DIA",
+  "Eroski",
+  "Lidl",
+  "Lupa",
+  "Mercadona",
+] as const;
 const COLUMNAS_RESULTADOS = {
   3: "md:grid-cols-3",
   4: "md:grid-cols-4",
@@ -43,21 +53,47 @@ const COLUMNAS_RESULTADOS = {
 
 type NumeroColumnas = keyof typeof COLUMNAS_RESULTADOS;
 
+function requiereCargaDirecta(url: string) {
+  try {
+    return new URL(url).hostname === "www.lupaonline.com";
+  } catch {
+    return false;
+  }
+}
+
 export function BuscadorProductos() {
   const [consulta, setConsulta] = useState("");
   const [soloOfertas, setSoloOfertas] = useState(false);
   const [buscando, setBuscando] = useState(false);
   const [resultado, setResultado] = useState<RespuestaBusqueda | null>(null);
   const [numeroColumnas, setNumeroColumnas] = useState<NumeroColumnas>(3);
+  const [supermercadosSeleccionados, setSupermercadosSeleccionados] = useState<
+    string[]
+  >([...SUPERMERCADOS]);
   const productosOrdenados = [...(resultado?.productos ?? [])].sort(
     (a, b) =>
       Math.min(...a.ofertas.map((oferta) => oferta.precio)) -
       Math.min(...b.ofertas.map((oferta) => oferta.precio)),
   );
 
-  async function buscar(valor: string, filtrarOfertas = soloOfertas) {
+  async function buscar(
+    valor: string,
+    filtrarOfertas = soloOfertas,
+    supermercados = supermercadosSeleccionados,
+  ) {
     const consultaLimpia = valor.trim();
     if (!filtrarOfertas && consultaLimpia.length < 2) return;
+    if (supermercados.length === 0) {
+      setResultado({
+        ok: true,
+        consulta: consultaLimpia,
+        soloOfertas: filtrarOfertas,
+        supermercados: [],
+        total: 0,
+        productos: [],
+      });
+      return;
+    }
 
     setConsulta(consultaLimpia);
     setSoloOfertas(filtrarOfertas);
@@ -68,6 +104,9 @@ export function BuscadorProductos() {
       const parametros = new URLSearchParams();
       if (consultaLimpia) parametros.set("q", consultaLimpia);
       if (filtrarOfertas) parametros.set("ofertas", "1");
+      for (const supermercado of supermercados) {
+        parametros.append("supermercado", supermercado);
+      }
       const respuesta = await fetch(`/api/productos/buscar?${parametros.toString()}`);
       setResultado((await respuesta.json()) as RespuestaBusqueda);
     } catch {
@@ -137,25 +176,67 @@ export function BuscadorProductos() {
         </label>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-sm">
-        <span className="mr-1 text-[#71837c]">Búsquedas populares:</span>
-        {BUSQUEDAS_POPULARES.map((busqueda) => (
-          <button
-            type="button"
-            key={busqueda}
-            onClick={() => void buscar(busqueda)}
-            className="rounded-full border border-[#17352b]/15 bg-white/70 px-3 py-1.5 font-medium transition hover:border-[#176b50] hover:text-[#176b50]"
-          >
-            {busqueda}
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => void buscar("", true)}
-          className="rounded-full border border-[#d89a22]/40 bg-[#fff4d5] px-3 py-1.5 font-bold text-[#8a5700] transition hover:border-[#d99100] hover:bg-[#ffe9ae]"
-        >
-          Ver ofertas
-        </button>
+      <div className="mx-auto mt-5 max-w-5xl rounded-2xl border border-[#17352b]/10 bg-white/60 px-4 py-4 sm:px-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-[#60766e]">
+            Filtrar por supermercado
+          </p>
+          <div className="flex gap-3 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                const seleccion = [...SUPERMERCADOS];
+                setSupermercadosSeleccionados(seleccion);
+                if (resultado) void buscar(consulta, soloOfertas, seleccion);
+              }}
+              className="text-[#176b50] hover:underline"
+            >
+              Seleccionar todos
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSupermercadosSeleccionados([]);
+                if (resultado) void buscar(consulta, soloOfertas, []);
+              }}
+              className="text-[#71837c] hover:underline"
+            >
+              Quitar todos
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
+          {SUPERMERCADOS.map((supermercado) => {
+            const seleccionado =
+              supermercadosSeleccionados.includes(supermercado);
+            return (
+              <label
+                key={supermercado}
+                className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${
+                  seleccionado
+                    ? "border-[#176b50]/35 bg-[#e7f5ee] text-[#176b50]"
+                    : "border-[#17352b]/12 bg-white/70 text-[#71837c] hover:border-[#176b50]/30"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={seleccionado}
+                  onChange={(evento) => {
+                    const seleccion = evento.target.checked
+                      ? [...supermercadosSeleccionados, supermercado]
+                      : supermercadosSeleccionados.filter(
+                          (item) => item !== supermercado,
+                        );
+                    setSupermercadosSeleccionados(seleccion);
+                    if (resultado) void buscar(consulta, soloOfertas, seleccion);
+                  }}
+                  className="size-4 accent-[#176b50]"
+                />
+                {supermercado}
+              </label>
+            );
+          })}
+        </div>
       </div>
 
       <div className="mt-12" aria-live="polite">
@@ -175,7 +256,9 @@ export function BuscadorProductos() {
                 : "No hemos encontrado ese producto"}
             </p>
             <p className="mt-2 text-[#71837c]">
-              {resultado.soloOfertas
+              {supermercadosSeleccionados.length === 0
+                ? "Selecciona al menos un supermercado."
+                : resultado.soloOfertas
                 ? "Prueba con otro producto o consulta todas las ofertas."
                 : "Prueba con un término más general."}
             </p>
@@ -285,6 +368,7 @@ function ProductoCard({
               src={producto.imagen}
               alt={producto.nombre}
               fill
+              unoptimized={requiereCargaDirecta(producto.imagen)}
               sizes={compacta ? "(min-width: 1024px) 20vw, 50vw" : "112px"}
               className="object-contain p-2"
             />
