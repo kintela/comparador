@@ -35,12 +35,20 @@ type RespuestaBusqueda = {
 };
 
 const BUSQUEDAS_POPULARES = ["leche", "huevos", "pan", "arroz", "aceite"];
+const COLUMNAS_RESULTADOS = {
+  3: "md:grid-cols-3",
+  4: "md:grid-cols-4",
+  5: "md:grid-cols-5",
+} as const;
+
+type NumeroColumnas = keyof typeof COLUMNAS_RESULTADOS;
 
 export function BuscadorProductos() {
   const [consulta, setConsulta] = useState("");
   const [soloOfertas, setSoloOfertas] = useState(false);
   const [buscando, setBuscando] = useState(false);
   const [resultado, setResultado] = useState<RespuestaBusqueda | null>(null);
+  const [numeroColumnas, setNumeroColumnas] = useState<NumeroColumnas>(3);
   const productosOrdenados = [...(resultado?.productos ?? [])].sort(
     (a, b) =>
       Math.min(...a.ofertas.map((oferta) => oferta.precio)) -
@@ -75,7 +83,7 @@ export function BuscadorProductos() {
   }
 
   return (
-    <div className="mx-auto mt-10 max-w-5xl sm:mt-12">
+    <div className="mx-auto mt-10 max-w-6xl sm:mt-12">
       <form
         onSubmit={enviar}
         className="mx-auto flex max-w-3xl flex-col gap-3 rounded-2xl border border-[#17352b]/10 bg-white p-2 shadow-[0_24px_70px_rgba(23,53,43,0.12)] sm:flex-row"
@@ -176,7 +184,7 @@ export function BuscadorProductos() {
 
         {resultado?.ok && productosOrdenados.length > 0 && (
           <div>
-            <div className="mb-5 flex items-end justify-between gap-4">
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-[#16805e]">Resultados</p>
                 <h2 className="mt-1 text-2xl font-bold">
@@ -187,11 +195,49 @@ export function BuscadorProductos() {
                     : `${resultado.total} productos para “${resultado.consulta}”`}
                 </h2>
               </div>
+              <div
+                className="flex items-center gap-1 rounded-xl border border-[#17352b]/10 bg-white p-1 shadow-sm"
+                aria-label="Fichas por fila"
+              >
+                <span
+                  className="grid size-9 place-items-center text-[#71837c]"
+                  title="Fichas por fila"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    className="size-5 fill-none stroke-current stroke-2"
+                  >
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                  </svg>
+                </span>
+                {([3, 4, 5] as const).map((columnas) => (
+                  <button
+                    key={columnas}
+                    type="button"
+                    onClick={() => setNumeroColumnas(columnas)}
+                    aria-label={`Mostrar ${columnas} fichas por fila`}
+                    aria-pressed={numeroColumnas === columnas}
+                    className={`grid size-9 place-items-center rounded-lg text-sm font-bold transition ${
+                      numeroColumnas === columnas
+                        ? "bg-[#176b50] text-white"
+                        : "text-[#60766e] hover:bg-[#17352b]/5 hover:text-[#176b50]"
+                    }`}
+                  >
+                    {columnas}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div
+              className={`grid gap-4 sm:grid-cols-2 ${COLUMNAS_RESULTADOS[numeroColumnas]}`}
+            >
               {productosOrdenados.map((producto) => (
-                <ProductoCard key={producto.id} producto={producto} />
+                <ProductoCard key={producto.id} producto={producto} compacta />
               ))}
             </div>
           </div>
@@ -211,26 +257,42 @@ function Cargando() {
   );
 }
 
-function ProductoCard({ producto }: { producto: Producto }) {
+function ProductoCard({
+  producto,
+  compacta = false,
+}: {
+  producto: Producto;
+  compacta?: boolean;
+}) {
   const ofertas = [...producto.ofertas].sort((a, b) => a.precio - b.precio);
 
   return (
-    <article className="rounded-2xl border border-[#17352b]/10 bg-white p-5 shadow-[0_10px_35px_rgba(23,53,43,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_45px_rgba(23,53,43,0.1)]">
-      <div className="flex gap-5">
-        <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-xl bg-[#f7f5ee] sm:h-32 sm:w-28">
+    <article
+      className={`rounded-2xl border border-[#17352b]/10 bg-white shadow-[0_10px_35px_rgba(23,53,43,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_45px_rgba(23,53,43,0.1)] ${
+        compacta ? "p-4" : "p-5"
+      }`}
+    >
+      <div className={compacta ? "block" : "flex gap-5"}>
+        <div
+          className={
+            compacta
+              ? "relative h-36 w-full overflow-hidden rounded-xl bg-[#f7f5ee]"
+              : "relative h-28 w-24 shrink-0 overflow-hidden rounded-xl bg-[#f7f5ee] sm:h-32 sm:w-28"
+          }
+        >
           {producto.imagen ? (
             <Image
               src={producto.imagen}
               alt={producto.nombre}
               fill
-              sizes="112px"
+              sizes={compacta ? "(min-width: 1024px) 20vw, 50vw" : "112px"}
               className="object-contain p-2"
             />
           ) : (
             <div className="grid h-full place-items-center text-3xl text-[#9eaaa5]">€</div>
           )}
         </div>
-        <div className="min-w-0 flex-1">
+        <div className={`min-w-0 flex-1 ${compacta ? "mt-4" : ""}`}>
           <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-[#71837c]">
             {producto.marca && <span>{producto.marca}</span>}
             {producto.categoria && <span>· {producto.categoria}</span>}
@@ -250,7 +312,11 @@ function ProductoCard({ producto }: { producto: Producto }) {
         {ofertas.map((oferta, indice) => (
           <div
             key={`${oferta.supermercado}-${oferta.tienda}`}
-            className="flex items-center justify-between gap-3 rounded-xl bg-[#f7f5ee] px-3 py-3"
+            className={`rounded-xl bg-[#f7f5ee] px-3 py-3 ${
+              compacta
+                ? "flex flex-col items-stretch gap-3"
+                : "flex items-center justify-between gap-3"
+            }`}
           >
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -276,7 +342,11 @@ function ProductoCard({ producto }: { producto: Producto }) {
                 </p>
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-3 text-right">
+            <div
+              className={`flex shrink-0 items-center gap-3 text-right ${
+                compacta ? "justify-between" : ""
+              }`}
+            >
               <div>
                 {oferta.precioOriginal && (
                   <p className="text-xs text-[#8b9994] line-through">

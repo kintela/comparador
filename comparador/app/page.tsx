@@ -32,8 +32,24 @@ export default function Home() {
               Encuentra el mejor precio para tu compra
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-[#60766e]">
-              Busca un producto y consulta su precio más reciente en los supermercados
-              disponibles.
+              Supermercados{" "}
+              <span className="group relative inline-flex">
+                <button
+                  type="button"
+                  className="cursor-help font-bold text-[#16805e] underline decoration-dotted underline-offset-4"
+                  aria-describedby="supermercados-rastreados"
+                >
+                  rastreados
+                </button>
+                <span
+                  id="supermercados-rastreados"
+                  role="tooltip"
+                  className="pointer-events-none absolute left-1/2 top-full z-20 mt-3 w-max max-w-[calc(100vw-2.5rem)] -translate-x-1/2 rounded-xl bg-[#17352b] px-4 py-3 text-left text-sm font-medium leading-6 text-white opacity-0 shadow-xl transition group-hover:opacity-100 group-focus-within:opacity-100"
+                >
+                  ALDI · BM Supermercados · Eroski · Mercadona
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 border-8 border-transparent border-b-[#17352b]" />
+                </span>
+              </span>
             </p>
           </div>
 
