@@ -31,6 +31,12 @@ const RASTREADORES = [
     href: "/admin/rastreo/dia",
     color: "border-red-500/40 hover:border-red-400",
   },
+  {
+    nombre: "Lidl",
+    descripcion: "Alimentación y ofertas publicadas para la región Vizcaya.",
+    href: "/admin/rastreo/lidl",
+    color: "border-blue-500/40 hover:border-blue-400",
+  },
 ];
 
 export default function PaginaAdmin() {

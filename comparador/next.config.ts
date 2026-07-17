@@ -28,6 +28,11 @@ const nextConfig: NextConfig = {
         hostname: "www.dia.es",
         pathname: "/product_images/**",
       },
+      {
+        protocol: "https",
+        hostname: "www.lidl.es",
+        pathname: "/assets/**",
+      },
     ],
   },
 };
