@@ -25,6 +25,12 @@ const RASTREADORES = [
     href: "/admin/rastreo/aldi",
     color: "border-cyan-500/40 hover:border-cyan-400",
   },
+  {
+    nombre: "DIA",
+    descripcion: "Catálogo oficial DIA Online, stock y promociones.",
+    href: "/admin/rastreo/dia",
+    color: "border-red-500/40 hover:border-red-400",
+  },
 ];
 
 export default function PaginaAdmin() {

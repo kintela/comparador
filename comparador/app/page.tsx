@@ -46,7 +46,7 @@ export default function Home() {
                   role="tooltip"
                   className="pointer-events-none absolute left-1/2 top-full z-20 mt-3 w-max max-w-[calc(100vw-2.5rem)] -translate-x-1/2 rounded-xl bg-[#17352b] px-4 py-3 text-left text-sm font-medium leading-6 text-white opacity-0 shadow-xl transition group-hover:opacity-100 group-focus-within:opacity-100"
                 >
-                  ALDI · BM Supermercados · Eroski · Mercadona
+                  ALDI · BM Supermercados · DIA · Eroski · Mercadona
                   <span className="absolute bottom-full left-1/2 -translate-x-1/2 border-8 border-transparent border-b-[#17352b]" />
                 </span>
               </span>

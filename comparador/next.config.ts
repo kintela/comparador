@@ -23,6 +23,11 @@ const nextConfig: NextConfig = {
         hostname: "s7g10.scene7.com",
         pathname: "/is/image/aldinord/**",
       },
+      {
+        protocol: "https",
+        hostname: "www.dia.es",
+        pathname: "/product_images/**",
+      },
     ],
   },
 };
