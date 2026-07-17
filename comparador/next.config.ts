@@ -38,6 +38,11 @@ const nextConfig: NextConfig = {
         hostname: "www.compraonline.alcampo.es",
         pathname: "/images-v3/**",
       },
+      {
+        protocol: "https",
+        hostname: "www.lupaonline.com",
+        pathname: "/media/catalog/product/**",
+      },
     ],
   },
 };

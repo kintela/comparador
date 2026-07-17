@@ -43,6 +43,12 @@ const RASTREADORES = [
     href: "/admin/rastreo/alcampo",
     color: "border-orange-500/40 hover:border-orange-400",
   },
+  {
+    nombre: "Lupa",
+    descripcion: "Catálogo oficial Lupa Online para Santander y promociones.",
+    href: "/admin/rastreo/lupa",
+    color: "border-fuchsia-500/40 hover:border-fuchsia-400",
+  },
 ];
 
 export default function PaginaAdmin() {
