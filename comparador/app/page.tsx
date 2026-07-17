@@ -1,65 +1,49 @@
-import Image from "next/image";
+import Link from "next/link";
+
+import { BuscadorProductos } from "./buscador-productos";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen bg-[#f7f5ee] text-[#17352b]">
+      <header className="border-b border-[#17352b]/10 bg-[#f7f5ee]/90 px-5 py-5 backdrop-blur sm:px-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
+          <Link href="/" className="flex items-center gap-3" aria-label="Inicio">
+            <span className="grid size-10 place-items-center rounded-xl bg-[#176b50] text-xl text-white">
+              €
+            </span>
+            <span className="text-xl font-bold tracking-tight">Comparador</span>
+          </Link>
+          <span className="hidden text-sm font-medium text-[#60766e] sm:block">
+            Precios claros para comprar mejor
+          </span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      <section className="relative overflow-hidden px-5 pb-16 pt-16 sm:px-8 sm:pb-24 sm:pt-24">
+        <div className="pointer-events-none absolute -right-28 top-10 size-80 rounded-full bg-[#f4c95d]/25 blur-3xl" />
+        <div className="pointer-events-none absolute -left-36 bottom-0 size-72 rounded-full bg-[#54b892]/15 blur-3xl" />
+
+        <div className="relative mx-auto max-w-6xl">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="mb-4 text-sm font-bold uppercase tracking-[0.22em] text-[#16805e]">
+              Compara antes de comprar
+            </p>
+            <h1 className="text-4xl font-bold leading-tight tracking-[-0.04em] sm:text-6xl">
+              Encuentra el mejor precio para tu compra
+            </h1>
+            <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-[#60766e]">
+              Busca un producto y consulta su precio más reciente en los supermercados
+              disponibles.
+            </p>
+          </div>
+
+          <BuscadorProductos />
         </div>
-      </main>
-    </div>
+      </section>
+
+      <footer className="border-t border-[#17352b]/10 px-5 py-8 text-center text-sm text-[#71837c]">
+        Los precios pueden variar según la tienda y la zona de entrega.
+      </footer>
+    </main>
   );
 }
