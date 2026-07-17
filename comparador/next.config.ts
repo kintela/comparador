@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
         hostname: "cdn-bm.aktiosdigitalservices.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "prod-mercadona.imgix.net",
+        pathname: "/images/**",
+      },
     ],
   },
 };

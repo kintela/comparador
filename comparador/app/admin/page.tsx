@@ -13,6 +13,12 @@ const RASTREADORES = [
     href: "/admin/rastreo/bm",
     color: "border-yellow-500/40 hover:border-yellow-400",
   },
+  {
+    nombre: "Mercadona",
+    descripcion: "Catálogo asignado al código postal 48980, con precios por zona.",
+    href: "/admin/rastreo/mercadona",
+    color: "border-emerald-500/40 hover:border-emerald-400",
+  },
 ];
 
 export default function PaginaAdmin() {

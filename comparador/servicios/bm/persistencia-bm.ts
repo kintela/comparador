@@ -3,9 +3,28 @@ import "server-only";
 import { crearSlug } from "@/servicios/eroski/categorias-eroski";
 import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
-import type { ErrorRastreoBm, ProductoBm } from "./tipos-bm";
+import type { ProductoBm } from "./tipos-bm";
 
 type ContextoBm = { cadenaId: string; tiendaId: string };
+type ErrorRastreoCatalogo = {
+  consulta: string;
+  mensaje: string;
+  pagina?: number;
+  categoriaId?: number;
+};
+export type ConfiguracionPersistenciaCatalogo = {
+  slugCadena: string;
+  nombreCadena: string;
+  urlCadena: string;
+  identificadorTienda: string;
+  nombreTienda: string;
+  zonaOnline: string;
+  urlCatalogo: string;
+  origen: string;
+  codigoPostal?: string;
+  municipio?: string;
+  provincia?: string;
+};
 type EntidadCatalogo = { id: string; slug: string };
 type ProductoNormalizadoDb = {
   id: string;
@@ -32,23 +51,54 @@ export type ResumenPersistenciaBm = {
   productosNormalizados: number;
 };
 
-async function obtenerContextoBm(): Promise<ContextoBm> {
+const CONFIGURACION_BM: ConfiguracionPersistenciaCatalogo = {
+  slugCadena: "bm-supermercados",
+  nombreCadena: "BM Supermercados",
+  urlCadena: "https://www.bmsupermercados.es",
+  identificadorTienda: "bm-online-general",
+  nombreTienda: "BM Online",
+  zonaOnline: "Catálogo online general",
+  urlCatalogo: "https://www.online.bmsupermercados.es/es",
+  origen: "bm-online-general",
+};
+
+async function obtenerContextoBm(
+  configuracion: ConfiguracionPersistenciaCatalogo,
+): Promise<ContextoBm> {
   const supabase = obtenerSupabaseServidor();
-  const { data: cadena, error: errorCadena } = await supabase
+  const { data: cadenaExistente, error: errorCadena } = await supabase
     .from("cadenas_supermercados")
     .select("id")
-    .eq("slug", "bm-supermercados")
+    .eq("slug", configuracion.slugCadena)
     .eq("activa", true)
-    .single();
-  if (errorCadena || !cadena) {
-    throw new Error("No se encontró la cadena BM Supermercados activa");
+    .maybeSingle();
+  if (errorCadena) throw errorCadena;
+
+  let cadena = cadenaExistente;
+  if (!cadena) {
+    const { data, error } = await supabase
+      .from("cadenas_supermercados")
+      .insert({
+        nombre: configuracion.nombreCadena,
+        slug: configuracion.slugCadena,
+        url_web: configuracion.urlCadena,
+        activa: true,
+      })
+      .select("id")
+      .single();
+    if (error || !data) {
+      throw new Error(
+        `No se pudo crear ${configuracion.nombreCadena}: ${error?.message ?? "sin datos"}`,
+      );
+    }
+    cadena = data;
   }
 
   const { data: tiendaExistente, error: errorTienda } = await supabase
     .from("tiendas")
     .select("id")
     .eq("cadena_supermercado_id", cadena.id)
-    .eq("identificador_externo", "bm-online-general")
+    .eq("identificador_externo", configuracion.identificadorTienda)
     .maybeSingle();
   if (errorTienda) throw errorTienda;
   if (tiendaExistente) return { cadenaId: cadena.id, tiendaId: tiendaExistente.id };
@@ -57,18 +107,23 @@ async function obtenerContextoBm(): Promise<ContextoBm> {
     .from("tiendas")
     .insert({
       cadena_supermercado_id: cadena.id,
-      identificador_externo: "bm-online-general",
-      nombre: "BM Online",
+      identificador_externo: configuracion.identificadorTienda,
+      nombre: configuracion.nombreTienda,
+      codigo_postal: configuracion.codigoPostal,
+      municipio: configuracion.municipio,
+      provincia: configuracion.provincia,
       es_tienda_online: true,
-      zona_online: "Catálogo online general",
+      zona_online: configuracion.zonaOnline,
       activa: true,
-      url_tienda: "https://www.online.bmsupermercados.es/es",
-      url_catalogo: "https://www.online.bmsupermercados.es/es",
+      url_tienda: configuracion.urlCatalogo,
+      url_catalogo: configuracion.urlCatalogo,
     })
     .select("id")
     .single();
   if (errorCrearTienda || !tienda) {
-    throw new Error(`No se pudo crear BM Online: ${errorCrearTienda?.message ?? "sin datos"}`);
+    throw new Error(
+      `No se pudo crear ${configuracion.nombreTienda}: ${errorCrearTienda?.message ?? "sin datos"}`,
+    );
   }
 
   return { cadenaId: cadena.id, tiendaId: tienda.id };
@@ -187,13 +242,12 @@ function resolverProductoNormalizado(
     if (porEan) return { id: porEan.id, puntuacion: 1, porEan: true };
   }
 
-  if (!producto.marcaOriginal) return null;
-  const slugMarca = crearSlug(producto.marcaOriginal);
   const candidatos = normalizados
     .filter(
       (item) =>
-        item.marcas?.nombre &&
-        crearSlug(item.marcas.nombre) === slugMarca &&
+        (!producto.marcaOriginal ||
+          (item.marcas?.nombre &&
+            crearSlug(item.marcas.nombre) === crearSlug(producto.marcaOriginal))) &&
         cantidadesCompatibles(producto.nombreOriginal, item.nombre),
     )
     .map((item) => ({
@@ -208,8 +262,9 @@ function resolverProductoNormalizado(
 
   const mejor = candidatos[0];
   const segundo = candidatos[1];
-  if (!mejor || mejor.puntuacion < 0.88) return null;
-  if (segundo && mejor.puntuacion - segundo.puntuacion < 0.12) return null;
+  const puntuacionMinima = producto.marcaOriginal ? 0.88 : 0.92;
+  if (!mejor || mejor.puntuacion < puntuacionMinima) return null;
+  if (segundo && mejor.puntuacion - segundo.puntuacion < 0.1) return null;
   return { ...mejor, porEan: false };
 }
 
@@ -237,7 +292,8 @@ function datosProductoSupermercado(
 async function registrarErrores(
   ejecucionId: string,
   cadenaId: string,
-  errores: ErrorRastreoBm[],
+  errores: ErrorRastreoCatalogo[],
+  nombreCadena: string,
 ) {
   if (errores.length === 0) return;
   const supabase = obtenerSupabaseServidor();
@@ -247,10 +303,19 @@ async function registrarErrores(
       cadena_supermercado_id: cadenaId,
       tipo_error: "extraccion",
       mensaje: item.mensaje,
-      datos: { consulta: item.consulta, pagina: item.pagina },
+      datos: {
+        consulta: item.consulta,
+        pagina: item.pagina,
+        categoria_id: item.categoriaId,
+      },
     })),
   );
-  if (error) console.error("No se pudieron registrar errores BM:", error.message);
+  if (error) {
+    console.error(
+      `No se pudieron registrar errores ${nombreCadena}:`,
+      error.message,
+    );
+  }
 }
 
 export async function guardarRastreoBm({
@@ -260,10 +325,12 @@ export async function guardarRastreoBm({
 }: {
   productos: ProductoBm[];
   consultas: string[];
-  errores: ErrorRastreoBm[];
-}): Promise<ResumenPersistenciaBm> {
+  errores: ErrorRastreoCatalogo[];
+},
+configuracion: ConfiguracionPersistenciaCatalogo = CONFIGURACION_BM,
+): Promise<ResumenPersistenciaBm> {
   const supabase = obtenerSupabaseServidor();
-  const contexto = await obtenerContextoBm();
+  const contexto = await obtenerContextoBm(configuracion);
   const ahora = new Date().toISOString();
   const { data: ejecucion, error: errorEjecucion } = await supabase
     .from("ejecuciones_rastreo")
@@ -273,12 +340,14 @@ export async function guardarRastreoBm({
       tipo_rastreo: "manual",
       estado: "en_proceso",
       fecha_inicio: ahora,
-      detalles: { consultas, origen: "bm-online-general", normalizacion: true },
+      detalles: { consultas, origen: configuracion.origen, normalizacion: true },
     })
     .select("id")
     .single();
   if (errorEjecucion || !ejecucion) {
-    throw new Error(`No se pudo crear la ejecución BM: ${errorEjecucion?.message ?? "sin datos"}`);
+    throw new Error(
+      `No se pudo crear la ejecución ${configuracion.nombreCadena}: ${errorEjecucion?.message ?? "sin datos"}`,
+    );
   }
 
   try {
@@ -359,7 +428,11 @@ export async function guardarRastreoBm({
     );
     const filasNormalizadas = pendientes.map((guardado) => {
       const origen = productosPorCodigo.get(guardado.identificador_externo);
-      if (!origen) throw new Error("No se encontró el producto BM para normalizar");
+      if (!origen) {
+        throw new Error(
+          `No se encontró el producto ${configuracion.nombreCadena} para normalizar`,
+        );
+      }
       const marcaId = origen.marcaOriginal
         ? marcas.porSlug.get(crearSlug(origen.marcaOriginal))
         : undefined;
@@ -388,7 +461,9 @@ export async function guardarRastreoBm({
       if (error) throw error;
       idsNormalizados = (data ?? []).map((producto) => producto.id);
       if (idsNormalizados.length !== pendientes.length) {
-        throw new Error("No se crearon todos los productos BM normalizados");
+        throw new Error(
+          `No se crearon todos los productos ${configuracion.nombreCadena} normalizados`,
+        );
       }
 
       const { error: errorVinculos } = await supabase
@@ -396,7 +471,11 @@ export async function guardarRastreoBm({
         .upsert(
           pendientes.map((guardado, indice) => {
             const origen = productosPorCodigo.get(guardado.identificador_externo);
-            if (!origen) throw new Error("No se encontró el producto BM para vincular");
+            if (!origen) {
+              throw new Error(
+                `No se encontró el producto ${configuracion.nombreCadena} para vincular`,
+              );
+            }
             return datosProductoSupermercado(
               origen,
               contexto.cadenaId,
@@ -455,7 +534,12 @@ export async function guardarRastreoBm({
     const { error: errorPrecios } = await supabase.from("precios").insert(precios);
     if (errorPrecios) throw errorPrecios;
 
-    await registrarErrores(ejecucion.id, contexto.cadenaId, errores);
+    await registrarErrores(
+      ejecucion.id,
+      contexto.cadenaId,
+      errores,
+      configuracion.nombreCadena,
+    );
     const { error: errorFinalizacion } = await supabase
       .from("ejecuciones_rastreo")
       .update({
@@ -467,7 +551,7 @@ export async function guardarRastreoBm({
         errores_detectados: errores.length,
         detalles: {
           consultas,
-          origen: "bm-online-general",
+          origen: configuracion.origen,
           productos_coincidentes: productosCoincidentes,
         },
       })
@@ -495,6 +579,8 @@ export async function guardarRastreoBm({
         mensaje_error: mensaje,
       })
       .eq("id", ejecucion.id);
-    throw new Error(`No se pudo guardar el rastreo BM: ${mensaje}`);
+    throw new Error(
+      `No se pudo guardar el rastreo ${configuracion.nombreCadena}: ${mensaje}`,
+    );
   }
 }
