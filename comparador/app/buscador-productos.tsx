@@ -10,6 +10,7 @@ type Oferta = {
   precio: number;
   precioOriginal: number | null;
   textoPromocion: string | null;
+  enOferta: boolean;
   disponible: boolean;
   fechaObtencion: string;
   urlProducto: string | null;
@@ -27,6 +28,7 @@ type Producto = {
 type RespuestaBusqueda = {
   ok: boolean;
   consulta?: string;
+  soloOfertas?: boolean;
   total?: number;
   productos?: Producto[];
   error?: string;
@@ -36,6 +38,7 @@ const BUSQUEDAS_POPULARES = ["leche", "huevos", "pan", "arroz", "aceite"];
 
 export function BuscadorProductos() {
   const [consulta, setConsulta] = useState("");
+  const [soloOfertas, setSoloOfertas] = useState(false);
   const [buscando, setBuscando] = useState(false);
   const [resultado, setResultado] = useState<RespuestaBusqueda | null>(null);
   const productosOrdenados = [...(resultado?.productos ?? [])].sort(
@@ -44,18 +47,20 @@ export function BuscadorProductos() {
       Math.min(...b.ofertas.map((oferta) => oferta.precio)),
   );
 
-  async function buscar(valor: string) {
+  async function buscar(valor: string, filtrarOfertas = soloOfertas) {
     const consultaLimpia = valor.trim();
-    if (consultaLimpia.length < 2) return;
+    if (!filtrarOfertas && consultaLimpia.length < 2) return;
 
     setConsulta(consultaLimpia);
+    setSoloOfertas(filtrarOfertas);
     setBuscando(true);
     setResultado(null);
 
     try {
-      const respuesta = await fetch(
-        `/api/productos/buscar?q=${encodeURIComponent(consultaLimpia)}`,
-      );
+      const parametros = new URLSearchParams();
+      if (consultaLimpia) parametros.set("q", consultaLimpia);
+      if (filtrarOfertas) parametros.set("ofertas", "1");
+      const respuesta = await fetch(`/api/productos/buscar?${parametros.toString()}`);
       setResultado((await respuesta.json()) as RespuestaBusqueda);
     } catch {
       setResultado({ ok: false, error: "No se pudo conectar con el buscador" });
@@ -90,7 +95,7 @@ export function BuscadorProductos() {
             onChange={(evento) => setConsulta(evento.target.value)}
             minLength={2}
             maxLength={80}
-            required
+            required={!soloOfertas}
             placeholder="¿Qué producto estás buscando?"
             className="h-12 w-full bg-transparent text-base text-[#17352b] outline-none placeholder:text-[#8d9b96]"
           />
@@ -104,6 +109,26 @@ export function BuscadorProductos() {
         </button>
       </form>
 
+      <div className="mt-4 flex justify-center">
+        <label className="flex cursor-pointer items-center gap-3 rounded-full border border-[#d89a22]/30 bg-[#fff8e8] px-4 py-2 text-sm font-semibold text-[#8a5700]">
+          <input
+            type="checkbox"
+            checked={soloOfertas}
+            onChange={(evento) => {
+              const activo = evento.target.checked;
+              setSoloOfertas(activo);
+              if (resultado && (consulta.trim().length >= 2 || activo)) {
+                void buscar(consulta, activo);
+              } else if (!activo && !consulta.trim()) {
+                setResultado(null);
+              }
+            }}
+            className="size-4 accent-[#d99100]"
+          />
+          Solo productos en oferta
+        </label>
+      </div>
+
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-sm">
         <span className="mr-1 text-[#71837c]">Búsquedas populares:</span>
         {BUSQUEDAS_POPULARES.map((busqueda) => (
@@ -116,6 +141,13 @@ export function BuscadorProductos() {
             {busqueda}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => void buscar("", true)}
+          className="rounded-full border border-[#d89a22]/40 bg-[#fff4d5] px-3 py-1.5 font-bold text-[#8a5700] transition hover:border-[#d99100] hover:bg-[#ffe9ae]"
+        >
+          Ver ofertas
+        </button>
       </div>
 
       <div className="mt-12" aria-live="polite">
@@ -129,8 +161,16 @@ export function BuscadorProductos() {
 
         {resultado?.ok && productosOrdenados.length === 0 && (
           <div className="rounded-3xl border border-[#17352b]/10 bg-white/70 px-6 py-14 text-center">
-            <p className="text-xl font-bold">No hemos encontrado ese producto</p>
-            <p className="mt-2 text-[#71837c]">Prueba con un término más general.</p>
+            <p className="text-xl font-bold">
+              {resultado.soloOfertas
+                ? "No hemos encontrado ofertas"
+                : "No hemos encontrado ese producto"}
+            </p>
+            <p className="mt-2 text-[#71837c]">
+              {resultado.soloOfertas
+                ? "Prueba con otro producto o consulta todas las ofertas."
+                : "Prueba con un término más general."}
+            </p>
           </div>
         )}
 
@@ -140,7 +180,11 @@ export function BuscadorProductos() {
               <div>
                 <p className="text-sm font-semibold text-[#16805e]">Resultados</p>
                 <h2 className="mt-1 text-2xl font-bold">
-                  {resultado.total} productos para “{resultado.consulta}”
+                  {resultado.soloOfertas
+                    ? resultado.consulta
+                      ? `${resultado.total} productos en oferta para “${resultado.consulta}”`
+                      : `${resultado.total} productos en oferta`
+                    : `${resultado.total} productos para “${resultado.consulta}”`}
                 </h2>
               </div>
             </div>
@@ -208,9 +252,14 @@ function ProductoCard({ producto }: { producto: Producto }) {
             key={`${oferta.supermercado}-${oferta.tienda}`}
             className="flex items-center justify-between gap-3 rounded-xl bg-[#f7f5ee] px-3 py-3"
           >
-          <div>
+            <div>
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm font-bold text-[#17352b]">{oferta.supermercado}</p>
+                {oferta.enOferta && (
+                  <span className="rounded-full bg-[#fff0c2] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#9a6200]">
+                    Oferta
+                  </span>
+                )}
                 {indice === 0 && ofertas.length > 1 && (
                   <span className="rounded-full bg-[#dff3e9] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#176b50]">
                     Mejor precio
@@ -239,9 +288,9 @@ function ProductoCard({ producto }: { producto: Producto }) {
                 )}
                 <p className="text-xl font-extrabold text-[#176b50]">
                   {oferta.precio.toLocaleString("es-ES", {
-                  style: "currency",
-                  currency: "EUR",
-                })}
+                    style: "currency",
+                    currency: "EUR",
+                  })}
                 </p>
               </div>
               {oferta.urlProducto && (

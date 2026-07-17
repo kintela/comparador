@@ -22,6 +22,8 @@ type PrecioDb = {
   precio: number;
   precio_promocional: number | null;
   texto_promocion: string | null;
+  fecha_inicio_promocion: string | null;
+  fecha_fin_promocion: string | null;
   disponible: boolean;
   fecha_obtencion: string;
   tiendas: {
@@ -32,42 +34,85 @@ type PrecioDb = {
 };
 
 export async function GET(request: Request) {
-  const consultaOriginal = new URL(request.url).searchParams.get("q")?.trim() ?? "";
+  const parametros = new URL(request.url).searchParams;
+  const consultaOriginal = parametros.get("q")?.trim() ?? "";
+  const soloOfertas = ["1", "true"].includes(parametros.get("ofertas")?.toLowerCase() ?? "");
   const consulta = consultaOriginal
     .replace(/[^\p{L}\p{N}\s.,-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 
-  if (consulta.length < 2 || consulta.length > 80) {
+  if ((!soloOfertas && consulta.length < 2) || consulta.length > 80) {
     return Response.json(
-      { ok: false, error: "La búsqueda debe tener entre 2 y 80 caracteres" },
+      {
+        ok: false,
+        error: soloOfertas
+          ? "La búsqueda no puede superar los 80 caracteres"
+          : "La búsqueda debe tener entre 2 y 80 caracteres",
+      },
       { status: 400 },
     );
   }
 
   try {
     const supabase = obtenerSupabaseServidor();
-    const { data, error } = await supabase
+    const seleccionProductos =
+      "id, producto_id, nombre_original, url_imagen, url_producto, productos(nombre, marcas(nombre), categorias(nombre)), cadenas_supermercados(nombre)";
+
+    let idsConPromocion: string[] | null = null;
+    if (soloOfertas && !consulta) {
+      const { data: preciosPromocionales, error: errorPromociones } = await supabase
+        .from("precios")
+        .select("producto_supermercado_id")
+        .or("precio_promocional.not.is.null,texto_promocion.not.is.null")
+        .order("fecha_obtencion", { ascending: false })
+        .limit(1000);
+
+      if (errorPromociones) throw errorPromociones;
+      idsConPromocion = [
+        ...new Set(
+          (preciosPromocionales ?? []).map((precio) => precio.producto_supermercado_id),
+        ),
+      ];
+
+      if (idsConPromocion.length === 0) {
+        return Response.json({
+          ok: true,
+          consulta,
+          soloOfertas,
+          total: 0,
+          productos: [],
+        });
+      }
+    }
+
+    const consultaProductos = supabase
       .from("productos_supermercado")
-      .select(
-        "id, producto_id, nombre_original, url_imagen, url_producto, productos(nombre, marcas(nombre), categorias(nombre)), cadenas_supermercados(nombre)",
-      )
-      .ilike("nombre_original", `%${consulta}%`)
-      .eq("activo", true)
-      .limit(60);
+      .select(seleccionProductos)
+      .eq("activo", true);
+
+    const { data, error } = consulta
+      ? await consultaProductos.ilike("nombre_original", `%${consulta}%`).limit(120)
+      : await consultaProductos.in("id", idsConPromocion ?? []).limit(200);
 
     if (error) throw error;
 
     const productosSupermercado = (data ?? []) as unknown as ProductoSupermercadoDb[];
     if (productosSupermercado.length === 0) {
-      return Response.json({ ok: true, consulta, total: 0, productos: [] });
+      return Response.json({
+        ok: true,
+        consulta,
+        soloOfertas,
+        total: 0,
+        productos: [],
+      });
     }
 
     const ids = productosSupermercado.map((producto) => producto.id);
     const { data: datosPrecios, error: errorPrecios } = await supabase
       .from("precios")
       .select(
-        "producto_supermercado_id, precio, precio_promocional, texto_promocion, disponible, fecha_obtencion, tiendas(id, nombre, municipio)",
+        "producto_supermercado_id, precio, precio_promocional, texto_promocion, fecha_inicio_promocion, fecha_fin_promocion, disponible, fecha_obtencion, tiendas(id, nombre, municipio)",
       )
       .in("producto_supermercado_id", ids)
       .order("fecha_obtencion", { ascending: false });
@@ -95,6 +140,7 @@ export async function GET(request: Request) {
           precio: number;
           precioOriginal: number | null;
           textoPromocion: string | null;
+          enOferta: boolean;
           disponible: boolean;
           fechaObtencion: string;
           urlProducto: string | null;
@@ -115,13 +161,29 @@ export async function GET(request: Request) {
 
       for (const precio of ultimoPrecioPorTienda.values()) {
         if (precio.producto_supermercado_id !== producto.id) continue;
+        const ahora = Date.now();
+        const promocionVigente =
+          (precio.precio_promocional !== null || Boolean(precio.texto_promocion)) &&
+          (!precio.fecha_inicio_promocion ||
+            new Date(precio.fecha_inicio_promocion).getTime() <= ahora) &&
+          (!precio.fecha_fin_promocion ||
+            new Date(precio.fecha_fin_promocion).getTime() >= ahora);
+
         agrupado.ofertas.push({
           supermercado: producto.cadenas_supermercados?.nombre ?? "Supermercado",
           tienda: precio.tiendas?.nombre ?? "Tienda online",
           municipio: precio.tiendas?.municipio ?? null,
-          precio: Number(precio.precio_promocional ?? precio.precio),
-          precioOriginal: precio.precio_promocional ? Number(precio.precio) : null,
-          textoPromocion: precio.texto_promocion,
+          precio: Number(
+            promocionVigente && precio.precio_promocional !== null
+              ? precio.precio_promocional
+              : precio.precio,
+          ),
+          precioOriginal:
+            promocionVigente && precio.precio_promocional !== null
+              ? Number(precio.precio)
+              : null,
+          textoPromocion: promocionVigente ? precio.texto_promocion : null,
+          enOferta: promocionVigente,
           disponible: precio.disponible,
           fechaObtencion: precio.fecha_obtencion,
           urlProducto: producto.url_producto,
@@ -134,10 +196,19 @@ export async function GET(request: Request) {
 
     const productos = [...agrupados.values()]
       .filter((producto) => producto.ofertas.length > 0)
+      .filter(
+        (producto) => !soloOfertas || producto.ofertas.some((oferta) => oferta.enOferta),
+      )
       .sort((a, b) => (a.ofertas[0]?.precio ?? Infinity) - (b.ofertas[0]?.precio ?? Infinity))
       .slice(0, 20);
 
-    return Response.json({ ok: true, consulta, total: productos.length, productos });
+    return Response.json({
+      ok: true,
+      consulta,
+      soloOfertas,
+      total: productos.length,
+      productos,
+    });
   } catch (error) {
     console.error(
       "Error al buscar productos:",
