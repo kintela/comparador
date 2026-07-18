@@ -45,6 +45,7 @@ const RASTREADORES = [
   { cadena: "Eroski", ruta: "eroski" },
   { cadena: "Lidl", ruta: "lidl" },
   { cadena: "Lupa", ruta: "lupa" },
+  { cadena: "Covirán", ruta: "coviran" },
   { cadena: "Mercadona", ruta: "mercadona" },
 ] as const;
 

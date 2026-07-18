@@ -45,6 +45,7 @@ const SUPERMERCADOS = [
   "Alcampo",
   "ALDI",
   "BM Supermercados",
+  "Covirán",
   "DIA",
   "Eroski",
   "Lidl",
@@ -60,6 +61,7 @@ const COLUMNAS_RESULTADOS = {
 type NumeroColumnas = keyof typeof COLUMNAS_RESULTADOS;
 
 function requiereCargaDirecta(url: string) {
+  if (url.startsWith("/api/imagenes/coviran")) return true;
   try {
     return new URL(url).hostname === "www.lupaonline.com";
   } catch {

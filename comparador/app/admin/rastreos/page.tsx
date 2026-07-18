@@ -55,6 +55,13 @@ const RASTREADORES = [
     href: "/admin/rastreo/lupa",
     color: "border-fuchsia-500/40 hover:border-fuchsia-400",
   },
+  {
+    nombre: "Covirán",
+    descripcion:
+      "Ofertas vigentes del folleto oficial para País Vasco y tiendas adheridas.",
+    href: "/admin/rastreo/coviran",
+    color: "border-violet-500/40 hover:border-violet-400",
+  },
 ];
 
 export default function PaginaRastreos() {

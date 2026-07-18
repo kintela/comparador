@@ -12,6 +12,7 @@ const SUPERMERCADOS = [
   { slug: "lidl", nombre: "Lidl" },
   { slug: "alcampo", nombre: "Alcampo" },
   { slug: "lupa", nombre: "Lupa" },
+  { slug: "coviran", nombre: "Covirán" },
 ] as const;
 
 type EjecucionDb = {
