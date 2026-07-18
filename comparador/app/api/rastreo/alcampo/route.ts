@@ -1,6 +1,7 @@
 import { autorizarAdmin } from "@/servicios/admin/autorizacion";
 import { guardarRastreoAlcampo } from "@/servicios/alcampo/persistencia-alcampo";
 import { rastrearLoteAlcampo } from "@/servicios/alcampo/rastreo-lote";
+import { ejecutarConBloqueoRastreo } from "@/servicios/rastreo/bloqueo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,8 @@ export async function POST(request: Request) {
   if (respuestaAutorizacion) return respuestaAutorizacion;
 
   let cuerpo: SolicitudRastreoAlcampo;
-  try {
+  return ejecutarConBloqueoRastreo("alcampo", async () => {
+    try {
     cuerpo = (await request.json()) as SolicitudRastreoAlcampo;
   } catch {
     return Response.json(
@@ -94,12 +96,13 @@ export async function POST(request: Request) {
       persistencia,
       productos: resultado.productos,
     });
-  } catch (error) {
+    } catch (error) {
     const mensaje =
       error instanceof Error
         ? error.message
         : "Error desconocido durante el rastreo Alcampo";
     console.error("Error en el rastreo manual de Alcampo:", mensaje);
-    return Response.json({ ok: false, error: mensaje }, { status: 502 });
-  }
+      return Response.json({ ok: false, error: mensaje }, { status: 502 });
+    }
+  });
 }

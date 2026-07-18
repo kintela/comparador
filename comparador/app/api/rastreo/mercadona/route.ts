@@ -1,6 +1,7 @@
 import { autorizarAdmin } from "@/servicios/admin/autorizacion";
 import { guardarRastreoMercadona } from "@/servicios/mercadona/persistencia-mercadona";
 import { rastrearLoteMercadona } from "@/servicios/mercadona/rastreo-lote";
+import { ejecutarConBloqueoRastreo } from "@/servicios/rastreo/bloqueo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,8 @@ export async function POST(request: Request) {
   if (respuestaAutorizacion) return respuestaAutorizacion;
 
   let cuerpo: SolicitudRastreoMercadona;
-  try {
+  return ejecutarConBloqueoRastreo("mercadona", async () => {
+    try {
     cuerpo = (await request.json()) as SolicitudRastreoMercadona;
   } catch {
     return Response.json(
@@ -104,12 +106,13 @@ export async function POST(request: Request) {
       persistencia,
       productos: resultado.productos,
     });
-  } catch (error) {
-    const mensaje =
-      error instanceof Error
-        ? error.message
-        : "Error desconocido durante el rastreo Mercadona";
-    console.error("Error en el rastreo manual de Mercadona:", mensaje);
-    return Response.json({ ok: false, error: mensaje }, { status: 502 });
-  }
+    } catch (error) {
+      const mensaje =
+        error instanceof Error
+          ? error.message
+          : "Error desconocido durante el rastreo Mercadona";
+      console.error("Error en el rastreo manual de Mercadona:", mensaje);
+      return Response.json({ ok: false, error: mensaje }, { status: 502 });
+    }
+  });
 }

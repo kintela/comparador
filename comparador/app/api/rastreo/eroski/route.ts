@@ -2,6 +2,7 @@ import { autorizarAdmin } from "@/servicios/admin/autorizacion";
 import { rastrearProductosEroski } from "@/servicios/eroski/cliente-eroski";
 import { guardarRastreoEroski } from "@/servicios/eroski/persistencia-eroski";
 import { rastrearLoteEroski } from "@/servicios/eroski/rastreo-lote";
+import { ejecutarConBloqueoRastreo } from "@/servicios/rastreo/bloqueo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -75,13 +76,17 @@ export async function POST(request: Request) {
   if (respuestaAutorizacion) return respuestaAutorizacion;
 
   let cuerpo: SolicitudRastreo;
-  try {
-    cuerpo = (await request.json()) as SolicitudRastreo;
-  } catch {
-    return Response.json({ ok: false, error: "El cuerpo JSON no es válido" }, { status: 400 });
-  }
+  return ejecutarConBloqueoRastreo("eroski", async () => {
+    try {
+      cuerpo = (await request.json()) as SolicitudRastreo;
+    } catch {
+      return Response.json(
+        { ok: false, error: "El cuerpo JSON no es válido" },
+        { status: 400 },
+      );
+    }
 
-  const consultas = Array.isArray(cuerpo.consultas)
+    const consultas = Array.isArray(cuerpo.consultas)
     ? [
         ...new Set(
           cuerpo.consultas
@@ -91,64 +96,65 @@ export async function POST(request: Request) {
         ),
       ]
     : [];
-  const paginasPorConsulta =
-    typeof cuerpo.paginasPorConsulta === "number" ? cuerpo.paginasPorConsulta : 1;
-  const maxProductos =
-    typeof cuerpo.maxProductos === "number" ? cuerpo.maxProductos : 250;
-  const guardar = cuerpo.guardar === true;
+    const paginasPorConsulta =
+      typeof cuerpo.paginasPorConsulta === "number" ? cuerpo.paginasPorConsulta : 1;
+    const maxProductos =
+      typeof cuerpo.maxProductos === "number" ? cuerpo.maxProductos : 250;
+    const guardar = cuerpo.guardar === true;
 
-  if (consultas.length === 0 || consultas.length > 30) {
-    return Response.json(
-      { ok: false, error: "Debes indicar entre 1 y 30 búsquedas válidas" },
-      { status: 400 },
-    );
-  }
+    if (consultas.length === 0 || consultas.length > 30) {
+      return Response.json(
+        { ok: false, error: "Debes indicar entre 1 y 30 búsquedas válidas" },
+        { status: 400 },
+      );
+    }
 
-  if (
-    !Number.isInteger(paginasPorConsulta) ||
-    paginasPorConsulta < 1 ||
-    paginasPorConsulta > 3 ||
-    !Number.isInteger(maxProductos) ||
-    maxProductos < 1 ||
-    maxProductos > 300
-  ) {
-    return Response.json(
-      {
-        ok: false,
-        error: "Las páginas deben estar entre 1 y 3 y el máximo entre 1 y 300",
-      },
-      { status: 400 },
-    );
-  }
+    if (
+      !Number.isInteger(paginasPorConsulta) ||
+      paginasPorConsulta < 1 ||
+      paginasPorConsulta > 3 ||
+      !Number.isInteger(maxProductos) ||
+      maxProductos < 1 ||
+      maxProductos > 300
+    ) {
+      return Response.json(
+        {
+          ok: false,
+          error: "Las páginas deben estar entre 1 y 3 y el máximo entre 1 y 300",
+        },
+        { status: 400 },
+      );
+    }
 
-  try {
-    const resultado = await rastrearLoteEroski({
-      consultas,
-      paginasPorConsulta,
-      maxProductos,
-    });
-    const persistencia = guardar
-      ? await guardarRastreoEroski({
-          productos: resultado.productos,
-          consultas,
-          errores: resultado.errores,
-        })
-      : null;
+    try {
+      const resultado = await rastrearLoteEroski({
+        consultas,
+        paginasPorConsulta,
+        maxProductos,
+      });
+      const persistencia = guardar
+        ? await guardarRastreoEroski({
+            productos: resultado.productos,
+            consultas,
+            errores: resultado.errores,
+          })
+        : null;
 
-    return Response.json({
-      ok: true,
-      guardado: guardar,
-      productosDetectados: resultado.productos.length,
-      peticionesRealizadas: resultado.peticionesRealizadas,
-      errores: resultado.errores,
-      persistencia,
-      productos: resultado.productos,
-    });
-  } catch (error) {
-    const mensaje =
-      error instanceof Error ? error.message : "Error desconocido durante el rastreo";
+      return Response.json({
+        ok: true,
+        guardado: guardar,
+        productosDetectados: resultado.productos.length,
+        peticionesRealizadas: resultado.peticionesRealizadas,
+        errores: resultado.errores,
+        persistencia,
+        productos: resultado.productos,
+      });
+    } catch (error) {
+      const mensaje =
+        error instanceof Error ? error.message : "Error desconocido durante el rastreo";
 
-    console.error("Error en el rastreo manual de Eroski:", mensaje);
-    return Response.json({ ok: false, error: mensaje }, { status: 502 });
-  }
+      console.error("Error en el rastreo manual de Eroski:", mensaje);
+      return Response.json({ ok: false, error: mensaje }, { status: 502 });
+    }
+  });
 }

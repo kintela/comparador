@@ -4,6 +4,7 @@ import {
   guardarRastreoBm,
   type ResumenPersistenciaBm,
 } from "@/servicios/bm/persistencia-bm";
+import type { TipoRastreo } from "@/servicios/rastreo/configuracion";
 
 import type { ErrorRastreoDia, ProductoDia } from "./tipos-dia";
 
@@ -12,15 +13,17 @@ export function guardarRastreoDia({
   consultas,
   errores,
   codigoPostal,
+  tipoRastreo = "manual",
 }: {
   productos: ProductoDia[];
   consultas: string[];
   errores: ErrorRastreoDia[];
   codigoPostal: string | null;
+  tipoRastreo?: TipoRastreo;
 }): Promise<ResumenPersistenciaBm> {
   const sufijoPostal = codigoPostal ? ` · ${codigoPostal}` : "";
   return guardarRastreoBm(
-    { productos, consultas, errores },
+    { productos, consultas, errores, tipoRastreo },
     {
       slugCadena: "dia",
       nombreCadena: "DIA",

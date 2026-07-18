@@ -1,6 +1,7 @@
 import { autorizarAdmin } from "@/servicios/admin/autorizacion";
 import { guardarRastreoDia } from "@/servicios/dia/persistencia-dia";
 import { rastrearLoteDia } from "@/servicios/dia/rastreo-lote";
+import { ejecutarConBloqueoRastreo } from "@/servicios/rastreo/bloqueo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,8 @@ export async function POST(request: Request) {
   if (respuestaAutorizacion) return respuestaAutorizacion;
 
   let cuerpo: SolicitudRastreoDia;
-  try {
+  return ejecutarConBloqueoRastreo("dia", async () => {
+    try {
     cuerpo = (await request.json()) as SolicitudRastreoDia;
   } catch {
     return Response.json(
@@ -96,12 +98,13 @@ export async function POST(request: Request) {
       persistencia,
       productos: resultado.productos,
     });
-  } catch (error) {
+    } catch (error) {
     const mensaje =
       error instanceof Error
         ? error.message
         : "Error desconocido durante el rastreo DIA";
     console.error("Error en el rastreo manual de DIA:", mensaje);
-    return Response.json({ ok: false, error: mensaje }, { status: 502 });
-  }
+      return Response.json({ ok: false, error: mensaje }, { status: 502 });
+    }
+  });
 }

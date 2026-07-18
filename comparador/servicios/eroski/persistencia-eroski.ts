@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { TipoRastreo } from "@/servicios/rastreo/configuracion";
 import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
 import { crearSlug } from "./categorias-eroski";
@@ -146,10 +147,12 @@ export async function guardarRastreoEroski({
   productos,
   consultas,
   errores,
+  tipoRastreo = "manual",
 }: {
   productos: ProductoEroski[];
   consultas: string[];
   errores: ErrorRastreoEroski[];
+  tipoRastreo?: TipoRastreo;
 }): Promise<ResumenPersistenciaEroski> {
   const supabase = obtenerSupabaseServidor();
   const contexto = await obtenerContextoEroski();
@@ -159,7 +162,7 @@ export async function guardarRastreoEroski({
     .insert({
       cadena_supermercado_id: contexto.cadenaId,
       tienda_id: contexto.tiendaId,
-      tipo_rastreo: "manual",
+      tipo_rastreo: tipoRastreo,
       estado: "en_proceso",
       fecha_inicio: ahora,
       detalles: { consultas, normalizacion: true },

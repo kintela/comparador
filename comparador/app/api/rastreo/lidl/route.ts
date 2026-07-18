@@ -1,6 +1,7 @@
 import { autorizarAdmin } from "@/servicios/admin/autorizacion";
 import { guardarRastreoLidl } from "@/servicios/lidl/persistencia-lidl";
 import { rastrearLoteLidl } from "@/servicios/lidl/rastreo-lote";
+import { ejecutarConBloqueoRastreo } from "@/servicios/rastreo/bloqueo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,8 @@ export async function POST(request: Request) {
   if (respuestaAutorizacion) return respuestaAutorizacion;
 
   let cuerpo: SolicitudRastreoLidl;
-  try {
+  return ejecutarConBloqueoRastreo("lidl", async () => {
+    try {
     cuerpo = (await request.json()) as SolicitudRastreoLidl;
   } catch {
     return Response.json(
@@ -93,12 +95,13 @@ export async function POST(request: Request) {
       persistencia,
       productos: resultado.productos,
     });
-  } catch (error) {
+    } catch (error) {
     const mensaje =
       error instanceof Error
         ? error.message
         : "Error desconocido durante el rastreo Lidl";
     console.error("Error en el rastreo manual de Lidl:", mensaje);
-    return Response.json({ ok: false, error: mensaje }, { status: 502 });
-  }
+      return Response.json({ ok: false, error: mensaje }, { status: 502 });
+    }
+  });
 }

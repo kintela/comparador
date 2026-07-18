@@ -2,33 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 
-const CONSULTAS_PREDETERMINADAS = [
-  "leche",
-  "huevos",
-  "pan",
-  "arroz",
-  "pasta",
-  "aceite",
-  "harina",
-  "azucar",
-  "cafe",
-  "agua",
-  "yogur",
-  "queso",
-  "mantequilla",
-  "pollo",
-  "carne",
-  "pescado",
-  "verduras",
-  "fruta",
-  "legumbres",
-  "conservas",
-  "cereales",
-  "galletas",
-  "papel higiénico",
-  "detergente",
-  "champú",
-].join("\n");
+import { CONSULTAS_RASTREO_TEXTO } from "@/servicios/rastreo/configuracion";
 
 type Producto = {
   identificadorExterno: string;
@@ -60,7 +34,7 @@ type Resultado = {
 
 export function PanelRastreoEroski() {
   const [token, setToken] = useState("");
-  const [consultasTexto, setConsultasTexto] = useState(CONSULTAS_PREDETERMINADAS);
+  const [consultasTexto, setConsultasTexto] = useState(CONSULTAS_RASTREO_TEXTO);
   const [paginas, setPaginas] = useState(1);
   const [maxProductos, setMaxProductos] = useState(250);
   const [cargando, setCargando] = useState(false);

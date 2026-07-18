@@ -1,6 +1,7 @@
 import "server-only";
 
 import { crearSlug } from "@/servicios/eroski/categorias-eroski";
+import type { TipoRastreo } from "@/servicios/rastreo/configuracion";
 import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
 import type { ProductoBm } from "./tipos-bm";
@@ -332,10 +333,12 @@ export async function guardarRastreoBm({
   productos,
   consultas,
   errores,
+  tipoRastreo = "manual",
 }: {
   productos: ProductoBm[];
   consultas: string[];
   errores: ErrorRastreoCatalogo[];
+  tipoRastreo?: TipoRastreo;
 },
 configuracion: ConfiguracionPersistenciaCatalogo = CONFIGURACION_BM,
 ): Promise<ResumenPersistenciaBm> {
@@ -347,7 +350,7 @@ configuracion: ConfiguracionPersistenciaCatalogo = CONFIGURACION_BM,
     .insert({
       cadena_supermercado_id: contexto.cadenaId,
       tienda_id: contexto.tiendaId,
-      tipo_rastreo: "manual",
+      tipo_rastreo: tipoRastreo,
       estado: "en_proceso",
       fecha_inicio: ahora,
       detalles: { consultas, origen: configuracion.origen, normalizacion: true },

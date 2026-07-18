@@ -2,12 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 
-const CONSULTAS_PREDETERMINADAS = [
-  "leche", "huevos", "pan", "arroz", "pasta", "aceite", "harina", "azucar",
-  "cafe", "agua", "yogur", "queso", "mantequilla", "pollo", "carne",
-  "pescado", "verduras", "fruta", "legumbres", "conservas", "cereales",
-  "galletas", "papel higiénico", "detergente", "champú",
-].join("\n");
+import { CONSULTAS_RASTREO_TEXTO } from "@/servicios/rastreo/configuracion";
 
 type ProductoLidl = {
   identificadorExterno: string;
@@ -38,7 +33,7 @@ type ResultadoLidl = {
 
 export function PanelRastreoLidl() {
   const [token, setToken] = useState("");
-  const [consultasTexto, setConsultasTexto] = useState(CONSULTAS_PREDETERMINADAS);
+  const [consultasTexto, setConsultasTexto] = useState(CONSULTAS_RASTREO_TEXTO);
   const [resultadosPorConsulta, setResultadosPorConsulta] = useState(10);
   const [maxProductos, setMaxProductos] = useState(250);
   const [cargando, setCargando] = useState(false);

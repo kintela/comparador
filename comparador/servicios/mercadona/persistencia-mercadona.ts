@@ -4,6 +4,7 @@ import {
   guardarRastreoBm,
   type ResumenPersistenciaBm,
 } from "@/servicios/bm/persistencia-bm";
+import type { TipoRastreo } from "@/servicios/rastreo/configuracion";
 
 import type {
   ErrorRastreoMercadona,
@@ -16,14 +17,16 @@ export function guardarRastreoMercadona({
   consultas,
   errores,
   zona,
+  tipoRastreo = "manual",
 }: {
   productos: ProductoMercadona[];
   consultas: string[];
   errores: ErrorRastreoMercadona[];
   zona: ZonaMercadona;
+  tipoRastreo?: TipoRastreo;
 }): Promise<ResumenPersistenciaBm> {
   return guardarRastreoBm(
-    { productos, consultas, errores },
+    { productos, consultas, errores, tipoRastreo },
     {
       slugCadena: "mercadona",
       nombreCadena: "Mercadona",

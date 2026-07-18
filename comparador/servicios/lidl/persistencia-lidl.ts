@@ -4,6 +4,7 @@ import {
   guardarRastreoBm,
   type ResumenPersistenciaBm,
 } from "@/servicios/bm/persistencia-bm";
+import type { TipoRastreo } from "@/servicios/rastreo/configuracion";
 
 import type { ErrorRastreoLidl, ProductoLidl } from "./tipos-lidl";
 
@@ -11,13 +12,15 @@ export function guardarRastreoLidl({
   productos,
   consultas,
   errores,
+  tipoRastreo = "manual",
 }: {
   productos: ProductoLidl[];
   consultas: string[];
   errores: ErrorRastreoLidl[];
+  tipoRastreo?: TipoRastreo;
 }): Promise<ResumenPersistenciaBm> {
   return guardarRastreoBm(
-    { productos, consultas, errores },
+    { productos, consultas, errores, tipoRastreo },
     {
       slugCadena: "lidl",
       nombreCadena: "Lidl",

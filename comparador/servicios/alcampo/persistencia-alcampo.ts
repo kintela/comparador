@@ -4,6 +4,7 @@ import {
   guardarRastreoBm,
   type ResumenPersistenciaBm,
 } from "@/servicios/bm/persistencia-bm";
+import type { TipoRastreo } from "@/servicios/rastreo/configuracion";
 
 import type { ErrorRastreoAlcampo, ProductoAlcampo } from "./tipos-alcampo";
 
@@ -12,14 +13,16 @@ export function guardarRastreoAlcampo({
   consultas,
   errores,
   regionId,
+  tipoRastreo = "manual",
 }: {
   productos: ProductoAlcampo[];
   consultas: string[];
   errores: ErrorRastreoAlcampo[];
   regionId: string | null;
+  tipoRastreo?: TipoRastreo;
 }): Promise<ResumenPersistenciaBm> {
   return guardarRastreoBm(
-    { productos, consultas, errores },
+    { productos, consultas, errores, tipoRastreo },
     {
       slugCadena: "alcampo",
       nombreCadena: "Alcampo",

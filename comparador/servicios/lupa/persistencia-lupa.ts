@@ -4,6 +4,7 @@ import {
   guardarRastreoBm,
   type ResumenPersistenciaBm,
 } from "@/servicios/bm/persistencia-bm";
+import type { TipoRastreo } from "@/servicios/rastreo/configuracion";
 
 import type { ErrorRastreoLupa, ProductoLupa } from "./tipos-lupa";
 
@@ -11,13 +12,15 @@ export function guardarRastreoLupa({
   productos,
   consultas,
   errores,
+  tipoRastreo = "manual",
 }: {
   productos: ProductoLupa[];
   consultas: string[];
   errores: ErrorRastreoLupa[];
+  tipoRastreo?: TipoRastreo;
 }): Promise<ResumenPersistenciaBm> {
   return guardarRastreoBm(
-    { productos, consultas, errores },
+    { productos, consultas, errores, tipoRastreo },
     {
       slugCadena: "lupa",
       nombreCadena: "Lupa",

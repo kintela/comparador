@@ -1,6 +1,7 @@
 import { autorizarAdmin } from "@/servicios/admin/autorizacion";
 import { guardarRastreoBm } from "@/servicios/bm/persistencia-bm";
 import { rastrearLoteBm } from "@/servicios/bm/rastreo-lote";
+import { ejecutarConBloqueoRastreo } from "@/servicios/rastreo/bloqueo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,8 @@ export async function POST(request: Request) {
   if (respuestaAutorizacion) return respuestaAutorizacion;
 
   let cuerpo: SolicitudRastreoBm;
-  try {
+  return ejecutarConBloqueoRastreo("bm", async () => {
+    try {
     cuerpo = (await request.json()) as SolicitudRastreoBm;
   } catch {
     return Response.json({ ok: false, error: "El cuerpo JSON no es válido" }, { status: 400 });
@@ -88,10 +90,11 @@ export async function POST(request: Request) {
       persistencia,
       productos: resultado.productos,
     });
-  } catch (error) {
-    const mensaje =
-      error instanceof Error ? error.message : "Error desconocido durante el rastreo BM";
-    console.error("Error en el rastreo manual de BM:", mensaje);
-    return Response.json({ ok: false, error: mensaje }, { status: 502 });
-  }
+    } catch (error) {
+      const mensaje =
+        error instanceof Error ? error.message : "Error desconocido durante el rastreo BM";
+      console.error("Error en el rastreo manual de BM:", mensaje);
+      return Response.json({ ok: false, error: mensaje }, { status: 502 });
+    }
+  });
 }
