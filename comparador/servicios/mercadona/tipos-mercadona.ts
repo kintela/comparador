@@ -37,6 +37,7 @@ export type RespuestaCategoriasMercadona = {
 export type ProductoApiMercadona = {
   id: string;
   display_name: string;
+  slug?: string | null;
   packaging?: string | null;
   published?: boolean;
   status?: string | null;

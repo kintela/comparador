@@ -30,6 +30,12 @@ type RespuestaBusqueda = {
   consulta?: string;
   soloOfertas?: boolean;
   supermercados?: string[];
+  solicitudRastreo?: {
+    registrada: boolean;
+    configurada: boolean;
+    totalSolicitudes?: number;
+    contabilizada?: boolean;
+  } | null;
   total?: number;
   productos?: Producto[];
   error?: string;
@@ -258,10 +264,22 @@ export function BuscadorProductos() {
             <p className="mt-2 text-[#71837c]">
               {supermercadosSeleccionados.length === 0
                 ? "Selecciona al menos un supermercado."
+                : resultado.solicitudRastreo?.registrada
+                  ? resultado.solicitudRastreo.contabilizada
+                    ? "Hemos añadido este producto a la cola de rastreo."
+                    : "Este producto ya estaba solicitado y continúa en la cola de rastreo."
                 : resultado.soloOfertas
                 ? "Prueba con otro producto o consulta todas las ofertas."
                 : "Prueba con un término más general."}
             </p>
+            {resultado.solicitudRastreo?.registrada && (
+              <p className="mt-3 text-sm font-semibold text-[#16805e]">
+                {resultado.solicitudRastreo.totalSolicitudes ?? 1}{" "}
+                {(resultado.solicitudRastreo.totalSolicitudes ?? 1) === 1
+                  ? "solicitud registrada"
+                  : "solicitudes registradas"}
+              </p>
+            )}
           </div>
         )}
 

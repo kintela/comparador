@@ -20,6 +20,25 @@ En producción, configura la misma variable en Vercel. La previsualización no e
 en Supabase; la opción **Rastrear y guardar** inserta productos nuevos y añade precios
 al histórico.
 
+## Solicitudes de productos no encontrados
+
+Ejecuta una vez en el **SQL Editor** de Supabase la migración:
+
+```text
+supabase/migrations/20260717150000_solicitudes_rastreo.sql
+```
+
+Después, las búsquedas normales sin resultados se añadirán automáticamente a una
+cola, con un máximo de un incremento por visitante anonimizado y día. La cola se
+gestiona desde:
+
+```text
+http://localhost:3000/admin/solicitudes-rastreo
+```
+
+El servidor utiliza `ADMIN_RASTREO_TOKEN` como clave del HMAC que se emplea para
+seudonimizar al solicitante. Nunca se guarda la dirección IP.
+
 ## Getting Started
 
 First, run the development server:

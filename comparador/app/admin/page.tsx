@@ -2,6 +2,12 @@ import Link from "next/link";
 
 const RASTREADORES = [
   {
+    nombre: "Solicitudes de productos",
+    descripcion: "Cola priorizada de búsquedas sin resultados pendientes de rastrear.",
+    href: "/admin/solicitudes-rastreo",
+    color: "border-violet-500/40 hover:border-violet-400",
+  },
+  {
     nombre: "Eroski",
     descripcion: "Catálogo y precios asociados a Eroski City Santurtzi.",
     href: "/admin/rastreo",

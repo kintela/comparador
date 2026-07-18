@@ -50,16 +50,46 @@ function obtenerMarca(nombre: string): string | null {
   );
 }
 
+function nombreConDescriptores(producto: ProductoApiMercadona) {
+  const nombre = producto.display_name.trim();
+  if (!producto.slug) return nombre;
+
+  const tokensNombre = new Set(normalizar(nombre).split(" "));
+  const tokensIgnorados = new Set([
+    "brick",
+    "brik",
+    "botella",
+    "bote",
+    "bolsa",
+    "caja",
+    "envase",
+    "pack",
+  ]);
+  const descriptores = normalizar(producto.slug)
+    .split(" ")
+    .filter(
+      (token) =>
+        token &&
+        !tokensNombre.has(token) &&
+        !tokensIgnorados.has(token) &&
+        !/^\d+$/.test(token),
+    );
+
+  return descriptores.length > 0
+    ? `${nombre} ${descriptores.join(" ")}`
+    : nombre;
+}
+
 function nombreConCantidad(producto: ProductoApiMercadona) {
   const instrucciones = producto.price_instructions;
   const cantidad = instrucciones?.unit_size;
   const unidad = instrucciones?.size_format?.trim();
-  if (!cantidad || !unidad) return producto.display_name.trim();
+  const nombre = nombreConDescriptores(producto);
+  if (!cantidad || !unidad) return nombre;
 
   const cantidadTexto = cantidad.toLocaleString("es-ES", {
     maximumFractionDigits: 3,
   });
-  const nombre = producto.display_name.trim();
   const patron = new RegExp(
     `\\b${cantidad.toString().replace(".", "[.,]")}\\s*${unidad}\\b`,
     "i",

@@ -233,6 +233,15 @@ function cantidadesCompatibles(nombreA: string, nombreB: string): boolean {
   return a.tipo === b.tipo && Math.abs(a.valor - b.valor) <= Math.max(a.valor, b.valor) * 0.01;
 }
 
+function variantesCompatibles(nombreA: string, nombreB: string): boolean {
+  const esFresca = (nombre: string) =>
+    /\b(fresca|fresco|pasteurizada|pasteurizado|refrigerada|refrigerado)\b/.test(
+      crearSlug(nombre).replaceAll("-", " "),
+    );
+
+  return esFresca(nombreA) === esFresca(nombreB);
+}
+
 function resolverProductoNormalizado(
   producto: ProductoBm,
   normalizados: ProductoNormalizadoDb[],
@@ -248,7 +257,8 @@ function resolverProductoNormalizado(
         (!producto.marcaOriginal ||
           (item.marcas?.nombre &&
             crearSlug(item.marcas.nombre) === crearSlug(producto.marcaOriginal))) &&
-        cantidadesCompatibles(producto.nombreOriginal, item.nombre),
+        cantidadesCompatibles(producto.nombreOriginal, item.nombre) &&
+        variantesCompatibles(producto.nombreOriginal, item.nombre),
     )
     .map((item) => ({
       id: item.id,

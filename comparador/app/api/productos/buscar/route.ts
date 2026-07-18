@@ -1,3 +1,4 @@
+import { registrarSolicitudRastreo } from "@/servicios/solicitudes-rastreo/servidor";
 import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
 export const runtime = "nodejs";
@@ -32,6 +33,37 @@ type PrecioDb = {
     municipio: string | null;
   } | null;
 };
+
+async function respuestaSinProductos({
+  request,
+  consulta,
+  soloOfertas,
+  supermercados,
+}: {
+  request: Request;
+  consulta: string;
+  soloOfertas: boolean;
+  supermercados: string[];
+}) {
+  const solicitudRastreo =
+    consulta && !soloOfertas
+      ? await registrarSolicitudRastreo({
+          request,
+          termino: consulta,
+          supermercados,
+        })
+      : null;
+
+  return Response.json({
+    ok: true,
+    consulta,
+    soloOfertas,
+    supermercados,
+    total: 0,
+    productos: [],
+    solicitudRastreo,
+  });
+}
 
 export async function GET(request: Request) {
   const parametros = new URL(request.url).searchParams;
@@ -84,13 +116,11 @@ export async function GET(request: Request) {
       ];
 
       if (idsConPromocion.length === 0) {
-        return Response.json({
-          ok: true,
+        return respuestaSinProductos({
+          request,
           consulta,
           soloOfertas,
           supermercados,
-          total: 0,
-          productos: [],
         });
       }
     }
@@ -110,13 +140,11 @@ export async function GET(request: Request) {
 
       const idsCadenas = (cadenas ?? []).map((cadena) => cadena.id);
       if (idsCadenas.length === 0) {
-        return Response.json({
-          ok: true,
+        return respuestaSinProductos({
+          request,
           consulta,
           soloOfertas,
           supermercados,
-          total: 0,
-          productos: [],
         });
       }
       consultaProductos = consultaProductos.in(
@@ -134,13 +162,11 @@ export async function GET(request: Request) {
     const productosSupermercado =
       (data ?? []) as unknown as ProductoSupermercadoDb[];
     if (productosSupermercado.length === 0) {
-      return Response.json({
-        ok: true,
+      return respuestaSinProductos({
+        request,
         consulta,
         soloOfertas,
         supermercados,
-        total: 0,
-        productos: [],
       });
     }
 
@@ -237,6 +263,15 @@ export async function GET(request: Request) {
       )
       .sort((a, b) => (a.ofertas[0]?.precio ?? Infinity) - (b.ofertas[0]?.precio ?? Infinity))
       .slice(0, 20);
+
+    if (productos.length === 0) {
+      return respuestaSinProductos({
+        request,
+        consulta,
+        soloOfertas,
+        supermercados,
+      });
+    }
 
     return Response.json({
       ok: true,
