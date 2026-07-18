@@ -12,7 +12,7 @@ const AREAS = [
   {
     nombre: "Catálogo de productos",
     descripcion:
-      "Consulta los productos catalogados, su cobertura por supermercado y gestiona los términos automáticos.",
+      "Consulta los productos activos con precio que se muestran en el comparador.",
     href: "/admin/catalogo",
     color: "border-cyan-500/40 hover:border-cyan-400",
     etiqueta: "Contenido",

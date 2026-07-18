@@ -17,9 +17,8 @@ export default function PaginaCatalogoAdmin() {
             Catálogo de productos
           </h1>
           <p className="mt-3 max-w-3xl text-slate-400">
-            Consulta qué productos están catalogados, en qué supermercados se
-            detectan y amplía los términos que utilizarán los próximos rastreos
-            automáticos.
+            Consulta exclusivamente los productos activos con precio que pueden
+            aparecer en las búsquedas de los usuarios.
           </p>
         </div>
 

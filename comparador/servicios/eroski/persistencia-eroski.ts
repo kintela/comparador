@@ -185,11 +185,17 @@ export async function guardarRastreoEroski({
     const identificadores = productos.map((producto) => producto.identificadorExterno);
     const { data: existentes, error: errorExistentes } = await supabase
       .from("productos_supermercado")
-      .select("identificador_externo")
+      .select("identificador_externo, producto_id")
       .eq("cadena_supermercado_id", contexto.cadenaId)
       .in("identificador_externo", identificadores);
     if (errorExistentes) throw errorExistentes;
 
+    const productoIdPorIdentificadorExistente = new Map(
+      (existentes ?? []).map((producto) => [
+        producto.identificador_externo,
+        producto.producto_id,
+      ]),
+    );
     const identificadoresExistentes = new Set(
       (existentes ?? []).map((producto) => producto.identificador_externo),
     );
@@ -212,7 +218,14 @@ export async function guardarRastreoEroski({
       .from("productos_supermercado")
       .upsert(
         productos.map((producto) =>
-          datosProductoSupermercado(producto, contexto.cadenaId, ahora),
+          datosProductoSupermercado(
+            producto,
+            contexto.cadenaId,
+            ahora,
+            productoIdPorIdentificadorExistente.get(
+              producto.identificadorExterno,
+            ) ?? undefined,
+          ),
         ),
         { onConflict: "cadena_supermercado_id,identificador_externo" },
       )

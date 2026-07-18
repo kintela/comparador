@@ -32,48 +32,28 @@ function supermercadosValidos(valor: unknown): SupermercadoRastreo[] | null {
 
 async function cargarContextoCatalogo() {
   const supabase = obtenerSupabaseServidor();
-  const [
-    cadenas,
-    terminos,
-    totalProductos,
-    totalReferencias,
-    productosSinPrecio,
-  ] = await Promise.all([
+  const [cadenas, totalProductos] = await Promise.all([
     supabase
       .from("cadenas_supermercados")
       .select("id, nombre, slug")
       .eq("activa", true)
       .order("nombre"),
     supabase
-      .from("terminos_rastreo")
+      .from("productos")
       .select(
-        "id, termino, termino_normalizado, supermercados, prioridad, activo, created_at, updated_at",
+        "id, productos_supermercado!inner(precios!inner())",
+        { count: "exact", head: true },
       )
-      .order("prioridad", { ascending: true })
-      .order("termino", { ascending: true }),
-    supabase.from("productos").select("*", { count: "exact", head: true }),
-    supabase
-      .from("productos_supermercado")
-      .select("*", { count: "exact", head: true }),
-    supabase.rpc("contar_productos_sin_precio"),
+      .eq("productos_supermercado.activo", true),
   ]);
 
-  const error =
-    cadenas.error ??
-    terminos.error ??
-    totalProductos.error ??
-    totalReferencias.error ??
-    productosSinPrecio.error;
+  const error = cadenas.error ?? totalProductos.error;
   if (error) throw error;
 
   return {
     cadenas: cadenas.data ?? [],
-    terminos: terminos.data ?? [],
     estadisticas: {
       productosCatalogados: totalProductos.count ?? 0,
-      referenciasSupermercado: totalReferencias.count ?? 0,
-      productosSinPrecio: Number(productosSinPrecio.data ?? 0),
-      terminosActivos: (terminos.data ?? []).filter((item) => item.activo).length,
     },
   };
 }
@@ -94,7 +74,7 @@ export async function GET(request: Request) {
   try {
     const supabase = obtenerSupabaseServidor();
     const contexto = await cargarContextoCatalogo();
-    let idsProductos: string[] | null = null;
+    let cadenaId: string | null = null;
 
     if (supermercado) {
       const cadena = contexto.cadenas.find((item) => item.slug === supermercado);
@@ -104,20 +84,7 @@ export async function GET(request: Request) {
           { status: 400 },
         );
       }
-      const { data, error } = await supabase
-        .from("productos_supermercado")
-        .select("producto_id")
-        .eq("cadena_supermercado_id", cadena.id)
-        .not("producto_id", "is", null)
-        .limit(5000);
-      if (error) throw error;
-      idsProductos = [
-        ...new Set(
-          (data ?? [])
-            .map((item) => item.producto_id)
-            .filter((id): id is string => Boolean(id)),
-        ),
-      ];
+      cadenaId = cadena.id;
     }
 
     const desde = (pagina - 1) * PRODUCTOS_POR_PAGINA;
@@ -125,29 +92,20 @@ export async function GET(request: Request) {
     let consulta = supabase
       .from("productos")
       .select(
-        "id, nombre, codigo_ean, url_imagen, activo, fecha_actualizacion, marcas(nombre), categorias(nombre), productos_supermercado(id, activo, fecha_ultima_deteccion, cadenas_supermercados(nombre, slug))",
+        "id, nombre, codigo_ean, url_imagen, activo, fecha_actualizacion, marcas(nombre), categorias(nombre), productos_supermercado!inner(id, activo, fecha_ultima_deteccion, cadena_supermercado_id, cadenas_supermercados(nombre, slug), precios!inner())",
         { count: "exact" },
       )
       .order("fecha_actualizacion", { ascending: false })
       .order("nombre", { ascending: true })
       .range(desde, hasta);
 
+    consulta = consulta.eq("productos_supermercado.activo", true);
     if (busqueda) consulta = consulta.ilike("nombre", `%${busqueda}%`);
-    if (idsProductos) {
-      if (idsProductos.length === 0) {
-        return Response.json({
-          ok: true,
-          ...contexto,
-          productos: [],
-          paginacion: {
-            pagina,
-            porPagina: PRODUCTOS_POR_PAGINA,
-            total: 0,
-            totalPaginas: 0,
-          },
-        });
-      }
-      consulta = consulta.in("id", idsProductos);
+    if (cadenaId) {
+      consulta = consulta.eq(
+        "productos_supermercado.cadena_supermercado_id",
+        cadenaId,
+      );
     }
 
     const { data, error, count } = await consulta;
