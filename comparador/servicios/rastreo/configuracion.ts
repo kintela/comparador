@@ -31,9 +31,9 @@ export const CONSULTAS_RASTREO_TEXTO =
 
 export const CONFIGURACION_RASTREO_AUTOMATICO = {
   consultas: [...CONSULTAS_RASTREO_HABITUALES],
-  resultadosPorConsulta: 10,
-  paginasEroskiPorConsulta: 1,
-  maxProductos: 250,
+  resultadosPorConsulta: 20,
+  paginasEroskiPorConsulta: 2,
+  maxProductos: 1000,
   codigoPostalMercadona: "48980",
 };
 

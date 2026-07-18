@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHmac } from "node:crypto";
 
+import { resolverTerminoRastreo } from "@/servicios/rastreo/resolucion-terminos";
 import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
 type ResultadoRpc = {
@@ -10,15 +11,6 @@ type ResultadoRpc = {
   estado_actual: string;
   contabilizada: boolean;
 };
-
-export function normalizarTerminoRastreo(termino: string) {
-  return termino
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("es")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
 
 function obtenerHashSolicitante(request: Request) {
   const ip =
@@ -53,14 +45,15 @@ export async function registrarSolicitudRastreo({
   totalSolicitudes?: number;
   contabilizada?: boolean;
 }> {
-  const terminoNormalizado = normalizarTerminoRastreo(termino);
+  const terminoResuelto = await resolverTerminoRastreo(termino);
+  const terminoNormalizado = terminoResuelto.normalizado;
   if (terminoNormalizado.length < 2) {
     return { registrada: false, configurada: true };
   }
 
   const supabase = obtenerSupabaseServidor();
   const { data, error } = await supabase.rpc("registrar_solicitud_rastreo", {
-    p_termino_original: termino,
+    p_termino_original: terminoResuelto.termino,
     p_termino_normalizado: terminoNormalizado,
     p_supermercados: supermercados,
     p_solicitante_hash: obtenerHashSolicitante(request),

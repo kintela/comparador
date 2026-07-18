@@ -1,4 +1,5 @@
 import { registrarSolicitudRastreo } from "@/servicios/solicitudes-rastreo/servidor";
+import { resolverTerminoRastreo } from "@/servicios/rastreo/resolucion-terminos";
 import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
 export const runtime = "nodejs";
@@ -96,6 +97,9 @@ export async function GET(request: Request) {
 
   try {
     const supabase = obtenerSupabaseServidor();
+    const terminoResuelto = consulta
+      ? await resolverTerminoRastreo(consulta)
+      : null;
     const seleccionProductos =
       "id, producto_id, nombre_original, url_imagen, url_producto, productos(nombre, marcas(nombre), categorias(nombre)), cadenas_supermercados(nombre)";
 
@@ -125,11 +129,7 @@ export async function GET(request: Request) {
       }
     }
 
-    let consultaProductos = supabase
-      .from("productos_supermercado")
-      .select(seleccionProductos)
-      .eq("activo", true);
-
+    let idsCadenas: string[] | null = null;
     if (supermercados.length > 0) {
       const { data: cadenas, error: errorCadenas } = await supabase
         .from("cadenas_supermercados")
@@ -138,7 +138,7 @@ export async function GET(request: Request) {
         .eq("activa", true);
       if (errorCadenas) throw errorCadenas;
 
-      const idsCadenas = (cadenas ?? []).map((cadena) => cadena.id);
+      idsCadenas = (cadenas ?? []).map((cadena) => cadena.id);
       if (idsCadenas.length === 0) {
         return respuestaSinProductos({
           request,
@@ -147,17 +147,39 @@ export async function GET(request: Request) {
           supermercados,
         });
       }
-      consultaProductos = consultaProductos.in(
-        "cadena_supermercado_id",
-        idsCadenas,
-      );
     }
 
-    const { data, error } = consulta
-      ? await consultaProductos.ilike("nombre_original", `%${consulta}%`).limit(120)
-      : await consultaProductos.in("id", idsConPromocion ?? []).limit(200);
+    function crearConsultaProductos() {
+      let consultaProductos = supabase
+        .from("productos_supermercado")
+        .select(seleccionProductos)
+        .eq("activo", true);
+      if (idsCadenas) {
+        consultaProductos = consultaProductos.in(
+          "cadena_supermercado_id",
+          idsCadenas,
+        );
+      }
+      return consultaProductos;
+    }
 
-    if (error) throw error;
+    let data: unknown[] = [];
+    if (consulta) {
+      for (const variante of terminoResuelto?.variantesBusqueda ?? [consulta]) {
+        const resultado = await crearConsultaProductos()
+          .ilike("nombre_original", `%${variante}%`)
+          .limit(120);
+        if (resultado.error) throw resultado.error;
+        data = resultado.data ?? [];
+        if (data.length > 0) break;
+      }
+    } else {
+      const resultado = await crearConsultaProductos()
+        .in("id", idsConPromocion ?? [])
+        .limit(200);
+      if (resultado.error) throw resultado.error;
+      data = resultado.data ?? [];
+    }
 
     const productosSupermercado =
       (data ?? []) as unknown as ProductoSupermercadoDb[];

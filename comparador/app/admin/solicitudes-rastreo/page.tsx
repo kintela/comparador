@@ -6,8 +6,8 @@ export default function PaginaSolicitudesRastreo() {
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-10 text-slate-100 sm:px-8">
       <div className="mx-auto max-w-6xl">
-        <Link href="/admin" className="text-sm text-slate-400 hover:text-white">
-          ← Volver a administración
+        <Link href="/admin/rastreos" className="text-sm text-slate-400 hover:text-white">
+          ← Volver a rastreos
         </Link>
         <div className="mb-8 mt-6">
           <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-violet-400">

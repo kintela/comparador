@@ -13,21 +13,26 @@ export async function rastrearLoteLidl({
   consultas,
   resultadosPorConsulta,
   maxProductos,
+  permitirVacio = false,
 }: {
   consultas: string[];
   resultadosPorConsulta: number;
   maxProductos: number;
+  permitirVacio?: boolean;
 }): Promise<{
   productos: ProductoLidl[];
   peticionesRealizadas: number;
   errores: ErrorRastreoLidl[];
+  resultadosPorConsulta: Record<string, number>;
 }> {
   const productos = new Map<string, ProductoLidl>();
   const errores: ErrorRastreoLidl[] = [];
+  const productosEncontradosPorConsulta: Record<string, number> = {};
   let peticionesRealizadas = 0;
 
   for (const consulta of consultas) {
     if (productos.size >= maxProductos) break;
+    productosEncontradosPorConsulta[consulta] = 0;
     if (peticionesRealizadas > 0) await esperar(PAUSA_ENTRE_BUSQUEDAS_MS);
 
     try {
@@ -36,6 +41,7 @@ export async function rastrearLoteLidl({
         limite: Math.min(resultadosPorConsulta, maxProductos - productos.size),
       });
       peticionesRealizadas += resultado.peticionesRealizadas;
+      productosEncontradosPorConsulta[consulta] = resultado.productos.length;
       for (const producto of resultado.productos) {
         productos.set(producto.identificadorExterno, producto);
         if (productos.size >= maxProductos) break;
@@ -50,7 +56,7 @@ export async function rastrearLoteLidl({
     }
   }
 
-  if (productos.size === 0) {
+  if (productos.size === 0 && !permitirVacio) {
     throw new Error("El rastreo de Lidl no devolvió ningún producto válido");
   }
 
@@ -58,5 +64,6 @@ export async function rastrearLoteLidl({
     productos: [...productos.values()].slice(0, maxProductos),
     peticionesRealizadas,
     errores,
+    resultadosPorConsulta: productosEncontradosPorConsulta,
   };
 }

@@ -13,23 +13,28 @@ export async function rastrearLoteAlcampo({
   consultas,
   resultadosPorConsulta,
   maxProductos,
+  permitirVacio = false,
 }: {
   consultas: string[];
   resultadosPorConsulta: number;
   maxProductos: number;
+  permitirVacio?: boolean;
 }): Promise<{
   productos: ProductoAlcampo[];
   peticionesRealizadas: number;
   errores: ErrorRastreoAlcampo[];
   regionId: string | null;
+  resultadosPorConsulta: Record<string, number>;
 }> {
   const productos = new Map<string, ProductoAlcampo>();
   const errores: ErrorRastreoAlcampo[] = [];
+  const productosEncontradosPorConsulta: Record<string, number> = {};
   let peticionesRealizadas = 0;
   let regionId: string | null = null;
 
   for (const consulta of consultas) {
     if (productos.size >= maxProductos) break;
+    productosEncontradosPorConsulta[consulta] = 0;
     if (peticionesRealizadas > 0) await esperar(PAUSA_ENTRE_BUSQUEDAS_MS);
 
     try {
@@ -38,6 +43,7 @@ export async function rastrearLoteAlcampo({
         limite: Math.min(resultadosPorConsulta, maxProductos - productos.size),
       });
       peticionesRealizadas += resultado.peticionesRealizadas;
+      productosEncontradosPorConsulta[consulta] = resultado.productos.length;
       regionId = resultado.regionId ?? regionId;
       for (const producto of resultado.productos) {
         productos.set(producto.identificadorExterno, producto);
@@ -53,7 +59,7 @@ export async function rastrearLoteAlcampo({
     }
   }
 
-  if (productos.size === 0) {
+  if (productos.size === 0 && !permitirVacio) {
     throw new Error("El rastreo de Alcampo no devolvió ningún producto válido");
   }
 
@@ -62,5 +68,6 @@ export async function rastrearLoteAlcampo({
     peticionesRealizadas,
     errores,
     regionId,
+    resultadosPorConsulta: productosEncontradosPorConsulta,
   };
 }

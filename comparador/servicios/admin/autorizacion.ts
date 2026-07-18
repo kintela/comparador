@@ -1,24 +1,26 @@
 import "server-only";
 
-import { timingSafeEqual } from "node:crypto";
+import {
+  configuracionAdminValida,
+  obtenerCookieSesion,
+  validarClaveAdmin,
+  validarSesionAdmin,
+} from "@/servicios/admin/sesion";
 
 export function autorizarAdmin(request: Request): Response | null {
-  const esperado = process.env.ADMIN_RASTREO_TOKEN?.trim();
-  if (!esperado || esperado.length < 16) {
+  if (!configuracionAdminValida()) {
     return Response.json(
       { ok: false, error: "ADMIN_RASTREO_TOKEN no está configurado en el servidor" },
       { status: 503 },
     );
   }
 
-  const recibido = request.headers.get("x-admin-token") ?? "";
-  const bufferEsperado = Buffer.from(esperado);
-  const bufferRecibido = Buffer.from(recibido);
-  const valido =
-    bufferEsperado.length === bufferRecibido.length &&
-    timingSafeEqual(bufferEsperado, bufferRecibido);
+  const sesionValida = validarSesionAdmin(obtenerCookieSesion(request));
+  const claveValida = validarClaveAdmin(
+    request.headers.get("x-admin-token") ?? "",
+  );
 
-  return valido
+  return sesionValida || claveValida
     ? null
     : Response.json({ ok: false, error: "No autorizado" }, { status: 401 });
 }

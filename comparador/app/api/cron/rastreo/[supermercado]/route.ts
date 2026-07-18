@@ -20,33 +20,40 @@ import {
   liberarBloqueoRastreo,
 } from "@/servicios/rastreo/bloqueo";
 import { CONFIGURACION_RASTREO_AUTOMATICO } from "@/servicios/rastreo/configuracion";
+import {
+  desactivarReferenciasNoEncontradas,
+  obtenerReferenciasNoActualizadas,
+} from "@/servicios/rastreo/referencias-pendientes";
+import {
+  normalizarTerminoRastreo,
+  obtenerTerminosRastreo,
+  SUPERMERCADOS_RASTREO,
+  type SupermercadoRastreo,
+} from "@/servicios/rastreo/terminos";
+import {
+  obtenerSolicitudesAutomaticas,
+  registrarResultadoSolicitudAutomatica,
+  type SolicitudAutomatica,
+} from "@/servicios/solicitudes-rastreo/automatico";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
-const SUPERMERCADOS = [
-  "eroski",
-  "bm",
-  "mercadona",
-  "aldi",
-  "dia",
-  "lidl",
-  "alcampo",
-  "lupa",
-] as const;
-
-type Supermercado = (typeof SUPERMERCADOS)[number];
 type ResumenCron = {
   productosDetectados: number;
   peticionesRealizadas: number;
   erroresDetectados: number;
   ejecucionId: string;
   preciosInsertados: number;
+  solicitudesProcesadas: number;
+  referenciasReintentadas: number;
+  referenciasActualizadas: number;
+  referenciasDesactivadas: number;
 };
 
-function esSupermercado(valor: string): valor is Supermercado {
-  return SUPERMERCADOS.includes(valor as Supermercado);
+function esSupermercado(valor: string): valor is SupermercadoRastreo {
+  return SUPERMERCADOS_RASTREO.includes(valor as SupermercadoRastreo);
 }
 
 function crearResumen(
@@ -56,6 +63,7 @@ function crearResumen(
     errores: unknown[];
   },
   persistencia: { ejecucionId: string; preciosInsertados: number },
+  solicitudesProcesadas: number,
 ): ResumenCron {
   return {
     productosDetectados: resultado.productos.length,
@@ -63,19 +71,240 @@ function crearResumen(
     erroresDetectados: resultado.errores.length,
     ejecucionId: persistencia.ejecucionId,
     preciosInsertados: persistencia.preciosInsertados,
+    solicitudesProcesadas,
+    referenciasReintentadas: 0,
+    referenciasActualizadas: 0,
+    referenciasDesactivadas: 0,
   };
 }
 
-async function ejecutarRastreo(supermercado: Supermercado): Promise<ResumenCron> {
+type ProductoIdentificable = {
+  identificadorExterno: string;
+};
+
+type ResultadoFallback = {
+  productos: ProductoIdentificable[];
+  peticionesRealizadas: number;
+  resultadosPorConsulta: Record<string, number>;
+  errores: Array<{ consulta: string; mensaje: string }>;
+};
+
+async function completarReferencias<R extends ResultadoFallback>({
+  supermercado,
+  desde,
+  rastrear,
+  persistir,
+}: {
+  supermercado: SupermercadoRastreo;
+  desde: string;
+  rastrear: (consultas: string[]) => Promise<R>;
+  persistir: (
+    productos: R["productos"],
+    resultado: R,
+    consultas: string[],
+  ) => Promise<{ preciosInsertados: number }>;
+}): Promise<{
+  reintentadas: number;
+  actualizadas: number;
+  desactivadas: number;
+  peticiones: number;
+  precios: number;
+}> {
+  const referencias = await obtenerReferenciasNoActualizadas({
+    supermercado,
+    desde,
+  });
+  if (referencias.length === 0) {
+    return {
+      reintentadas: 0,
+      actualizadas: 0,
+      desactivadas: 0,
+      peticiones: 0,
+      precios: 0,
+    };
+  }
+
+  const consultas = [
+    ...new Set(referencias.map((referencia) => referencia.nombreOriginal)),
+  ];
+  const identificadores = new Set(
+    referencias.map((referencia) => referencia.identificadorExterno),
+  );
+
+  try {
+    const resultado = await rastrear(consultas);
+    const productos = resultado.productos.filter((producto) =>
+      identificadores.has(producto.identificadorExterno),
+    );
+    const encontrados = new Set(
+      productos.map((producto) => producto.identificadorExterno),
+    );
+    const noEncontradas = referencias.filter((referencia) => {
+      if (encontrados.has(referencia.identificadorExterno)) return false;
+      if (
+        !Object.prototype.hasOwnProperty.call(
+          resultado.resultadosPorConsulta,
+          referencia.nombreOriginal,
+        )
+      ) {
+        return false;
+      }
+      const errores = resultado.errores.filter(
+        (error) => error.consulta === referencia.nombreOriginal,
+      );
+      return (
+        errores.length === 0 ||
+        errores.every((error) => esRespuestaSinResultados(error.mensaje))
+      );
+    });
+    const desactivadas = await desactivarReferenciasNoEncontradas({
+      supermercado,
+      identificadores: noEncontradas.map(
+        (referencia) => referencia.identificadorExterno,
+      ),
+    });
+    if (productos.length === 0) {
+      return {
+        reintentadas: referencias.length,
+        actualizadas: 0,
+        desactivadas,
+        peticiones: resultado.peticionesRealizadas,
+        precios: 0,
+      };
+    }
+    const persistencia = await persistir(productos, resultado, consultas);
+    return {
+      reintentadas: referencias.length,
+      actualizadas: productos.length,
+      desactivadas,
+      peticiones: resultado.peticionesRealizadas,
+      precios: persistencia.preciosInsertados,
+    };
+  } catch (error) {
+    console.error(
+      `No se pudieron completar referencias de ${supermercado}:`,
+      error instanceof Error ? error.message : error,
+    );
+    return {
+      reintentadas: referencias.length,
+      actualizadas: 0,
+      desactivadas: 0,
+      peticiones: 0,
+      precios: 0,
+    };
+  }
+}
+
+function sumarReferencias(
+  resumen: ResumenCron,
+  extra: Awaited<ReturnType<typeof completarReferencias>>,
+): ResumenCron {
+  return {
+    ...resumen,
+    peticionesRealizadas: resumen.peticionesRealizadas + extra.peticiones,
+    preciosInsertados: resumen.preciosInsertados + extra.precios,
+    referenciasReintentadas: extra.reintentadas,
+    referenciasActualizadas: extra.actualizadas,
+    referenciasDesactivadas: extra.desactivadas,
+  };
+}
+
+function combinarConsultas(
+  solicitudes: SolicitudAutomatica[],
+  terminos: string[],
+): string[] {
+  const consultas = new Map<string, string>();
+  for (const consulta of [
+    ...solicitudes.map((solicitud) => solicitud.termino),
+    ...terminos,
+  ]) {
+    const normalizada = normalizarTerminoRastreo(consulta);
+    if (normalizada && !consultas.has(normalizada)) {
+      consultas.set(normalizada, consulta);
+    }
+  }
+  return [...consultas.values()];
+}
+
+function esRespuestaSinResultados(mensaje: string): boolean {
+  return (
+    /no se pudieron identificar productos/i.test(mensaje) ||
+    /no se encontr[oó] una categor[ií]a adecuada/i.test(mensaje) ||
+    /no devolvi[oó] ning[uú]n producto/i.test(mensaje) ||
+    /respondi[oó] con estado 404/i.test(mensaje)
+  );
+}
+
+async function guardarResultadosSolicitudes(
+  supermercado: SupermercadoRastreo,
+  solicitudes: SolicitudAutomatica[],
+  resultado: {
+    resultadosPorConsulta: Record<string, number>;
+    errores: Array<{ consulta: string; mensaje: string }>;
+  },
+): Promise<number> {
+  let procesadas = 0;
+  for (const solicitud of solicitudes) {
+    if (
+      !Object.prototype.hasOwnProperty.call(
+        resultado.resultadosPorConsulta,
+        solicitud.termino,
+      )
+    ) {
+      continue;
+    }
+
+    const productosEncontrados =
+      resultado.resultadosPorConsulta[solicitud.termino] ?? 0;
+    const error =
+      productosEncontrados === 0
+        ? resultado.errores.find(
+            (item) =>
+              item.consulta === solicitud.termino &&
+              !esRespuestaSinResultados(item.mensaje),
+          )?.mensaje
+        : undefined;
+    await registrarResultadoSolicitudAutomatica({
+      solicitud,
+      supermercado,
+      productosEncontrados,
+      error,
+    });
+    procesadas += 1;
+  }
+  return procesadas;
+}
+
+async function ejecutarRastreo(
+  supermercado: SupermercadoRastreo,
+): Promise<ResumenCron> {
+  const inicioActualizacion = new Date().toISOString();
   const {
-    consultas,
     resultadosPorConsulta,
     paginasEroskiPorConsulta,
     maxProductos,
     codigoPostalMercadona,
   } = CONFIGURACION_RASTREO_AUTOMATICO;
+  const [solicitudes, terminos] = await Promise.all([
+    obtenerSolicitudesAutomaticas(supermercado),
+    obtenerTerminosRastreo(supermercado),
+  ]);
+  const consultas = combinarConsultas(solicitudes, terminos);
+  if (consultas.length === 0) {
+    throw new Error(
+      `No hay términos de rastreo activos para ${supermercado}`,
+    );
+  }
 
-  const parametros = { consultas, resultadosPorConsulta, maxProductos };
+  const maxProductosLote =
+    maxProductos +
+    solicitudes.length *
+      (supermercado === "eroski" ? 50 : resultadosPorConsulta);
+  const parametros = {
+    consultas,
+    resultadosPorConsulta,
+    maxProductos: maxProductosLote,
+  };
   const tipoRastreo = "automatico" as const;
 
   switch (supermercado) {
@@ -83,7 +312,7 @@ async function ejecutarRastreo(supermercado: Supermercado): Promise<ResumenCron>
       const resultado = await rastrearLoteEroski({
         consultas,
         paginasPorConsulta: paginasEroskiPorConsulta,
-        maxProductos,
+        maxProductos: maxProductosLote,
       });
       const persistencia = await guardarRastreoEroski({
         productos: resultado.productos,
@@ -91,7 +320,31 @@ async function ejecutarRastreo(supermercado: Supermercado): Promise<ResumenCron>
         errores: resultado.errores,
         tipoRastreo,
       });
-      return crearResumen(resultado, persistencia);
+      const procesadas = await guardarResultadosSolicitudes(
+        supermercado,
+        solicitudes,
+        resultado,
+      );
+      const resumen = crearResumen(resultado, persistencia, procesadas);
+      const extra = await completarReferencias({
+        supermercado,
+        desde: inicioActualizacion,
+        rastrear: (consultasFallback) =>
+          rastrearLoteEroski({
+            consultas: consultasFallback,
+            paginasPorConsulta: 1,
+            maxProductos: consultasFallback.length * 50,
+            permitirVacio: true,
+          }),
+        persistir: (productos, resultadoFallback, consultasFallback) =>
+          guardarRastreoEroski({
+            productos,
+            consultas: consultasFallback,
+            errores: resultadoFallback.errores,
+            tipoRastreo,
+          }),
+      });
+      return sumarReferencias(resumen, extra);
     }
     case "bm": {
       const resultado = await rastrearLoteBm(parametros);
@@ -101,7 +354,31 @@ async function ejecutarRastreo(supermercado: Supermercado): Promise<ResumenCron>
         errores: resultado.errores,
         tipoRastreo,
       });
-      return crearResumen(resultado, persistencia);
+      const procesadas = await guardarResultadosSolicitudes(
+        supermercado,
+        solicitudes,
+        resultado,
+      );
+      const resumen = crearResumen(resultado, persistencia, procesadas);
+      const extra = await completarReferencias({
+        supermercado,
+        desde: inicioActualizacion,
+        rastrear: (consultasFallback) =>
+          rastrearLoteBm({
+            consultas: consultasFallback,
+            resultadosPorConsulta,
+            maxProductos: consultasFallback.length * resultadosPorConsulta,
+            permitirVacio: true,
+          }),
+        persistir: (productos, resultadoFallback, consultasFallback) =>
+          guardarRastreoBm({
+            productos,
+            consultas: consultasFallback,
+            errores: resultadoFallback.errores,
+            tipoRastreo,
+          }),
+      });
+      return sumarReferencias(resumen, extra);
     }
     case "mercadona": {
       const resultado = await rastrearLoteMercadona({
@@ -115,7 +392,33 @@ async function ejecutarRastreo(supermercado: Supermercado): Promise<ResumenCron>
         zona: resultado.zona,
         tipoRastreo,
       });
-      return crearResumen(resultado, persistencia);
+      const procesadas = await guardarResultadosSolicitudes(
+        supermercado,
+        solicitudes,
+        resultado,
+      );
+      const resumen = crearResumen(resultado, persistencia, procesadas);
+      const extra = await completarReferencias({
+        supermercado,
+        desde: inicioActualizacion,
+        rastrear: (consultasFallback) =>
+          rastrearLoteMercadona({
+            consultas: consultasFallback,
+            resultadosPorConsulta,
+            maxProductos: consultasFallback.length * resultadosPorConsulta,
+            codigoPostal: codigoPostalMercadona,
+            permitirVacio: true,
+          }),
+        persistir: (productos, resultadoFallback, consultasFallback) =>
+          guardarRastreoMercadona({
+            productos,
+            consultas: consultasFallback,
+            errores: resultadoFallback.errores,
+            zona: resultadoFallback.zona,
+            tipoRastreo,
+          }),
+      });
+      return sumarReferencias(resumen, extra);
     }
     case "aldi": {
       const resultado = await rastrearLoteAldi(parametros);
@@ -125,7 +428,31 @@ async function ejecutarRastreo(supermercado: Supermercado): Promise<ResumenCron>
         errores: resultado.errores,
         tipoRastreo,
       });
-      return crearResumen(resultado, persistencia);
+      const procesadas = await guardarResultadosSolicitudes(
+        supermercado,
+        solicitudes,
+        resultado,
+      );
+      const resumen = crearResumen(resultado, persistencia, procesadas);
+      const extra = await completarReferencias({
+        supermercado,
+        desde: inicioActualizacion,
+        rastrear: (consultasFallback) =>
+          rastrearLoteAldi({
+            consultas: consultasFallback,
+            resultadosPorConsulta,
+            maxProductos: consultasFallback.length * resultadosPorConsulta,
+            permitirVacio: true,
+          }),
+        persistir: (productos, resultadoFallback, consultasFallback) =>
+          guardarRastreoAldi({
+            productos,
+            consultas: consultasFallback,
+            errores: resultadoFallback.errores,
+            tipoRastreo,
+          }),
+      });
+      return sumarReferencias(resumen, extra);
     }
     case "dia": {
       const resultado = await rastrearLoteDia(parametros);
@@ -136,7 +463,32 @@ async function ejecutarRastreo(supermercado: Supermercado): Promise<ResumenCron>
         codigoPostal: resultado.codigoPostal,
         tipoRastreo,
       });
-      return crearResumen(resultado, persistencia);
+      const procesadas = await guardarResultadosSolicitudes(
+        supermercado,
+        solicitudes,
+        resultado,
+      );
+      const resumen = crearResumen(resultado, persistencia, procesadas);
+      const extra = await completarReferencias({
+        supermercado,
+        desde: inicioActualizacion,
+        rastrear: (consultasFallback) =>
+          rastrearLoteDia({
+            consultas: consultasFallback,
+            resultadosPorConsulta,
+            maxProductos: consultasFallback.length * resultadosPorConsulta,
+            permitirVacio: true,
+          }),
+        persistir: (productos, resultadoFallback, consultasFallback) =>
+          guardarRastreoDia({
+            productos,
+            consultas: consultasFallback,
+            errores: resultadoFallback.errores,
+            codigoPostal: resultadoFallback.codigoPostal,
+            tipoRastreo,
+          }),
+      });
+      return sumarReferencias(resumen, extra);
     }
     case "lidl": {
       const resultado = await rastrearLoteLidl(parametros);
@@ -146,7 +498,31 @@ async function ejecutarRastreo(supermercado: Supermercado): Promise<ResumenCron>
         errores: resultado.errores,
         tipoRastreo,
       });
-      return crearResumen(resultado, persistencia);
+      const procesadas = await guardarResultadosSolicitudes(
+        supermercado,
+        solicitudes,
+        resultado,
+      );
+      const resumen = crearResumen(resultado, persistencia, procesadas);
+      const extra = await completarReferencias({
+        supermercado,
+        desde: inicioActualizacion,
+        rastrear: (consultasFallback) =>
+          rastrearLoteLidl({
+            consultas: consultasFallback,
+            resultadosPorConsulta,
+            maxProductos: consultasFallback.length * resultadosPorConsulta,
+            permitirVacio: true,
+          }),
+        persistir: (productos, resultadoFallback, consultasFallback) =>
+          guardarRastreoLidl({
+            productos,
+            consultas: consultasFallback,
+            errores: resultadoFallback.errores,
+            tipoRastreo,
+          }),
+      });
+      return sumarReferencias(resumen, extra);
     }
     case "alcampo": {
       const resultado = await rastrearLoteAlcampo(parametros);
@@ -157,7 +533,32 @@ async function ejecutarRastreo(supermercado: Supermercado): Promise<ResumenCron>
         regionId: resultado.regionId,
         tipoRastreo,
       });
-      return crearResumen(resultado, persistencia);
+      const procesadas = await guardarResultadosSolicitudes(
+        supermercado,
+        solicitudes,
+        resultado,
+      );
+      const resumen = crearResumen(resultado, persistencia, procesadas);
+      const extra = await completarReferencias({
+        supermercado,
+        desde: inicioActualizacion,
+        rastrear: (consultasFallback) =>
+          rastrearLoteAlcampo({
+            consultas: consultasFallback,
+            resultadosPorConsulta,
+            maxProductos: consultasFallback.length * resultadosPorConsulta,
+            permitirVacio: true,
+          }),
+        persistir: (productos, resultadoFallback, consultasFallback) =>
+          guardarRastreoAlcampo({
+            productos,
+            consultas: consultasFallback,
+            errores: resultadoFallback.errores,
+            regionId: resultadoFallback.regionId,
+            tipoRastreo,
+          }),
+      });
+      return sumarReferencias(resumen, extra);
     }
     case "lupa": {
       const resultado = await rastrearLoteLupa(parametros);
@@ -167,7 +568,31 @@ async function ejecutarRastreo(supermercado: Supermercado): Promise<ResumenCron>
         errores: resultado.errores,
         tipoRastreo,
       });
-      return crearResumen(resultado, persistencia);
+      const procesadas = await guardarResultadosSolicitudes(
+        supermercado,
+        solicitudes,
+        resultado,
+      );
+      const resumen = crearResumen(resultado, persistencia, procesadas);
+      const extra = await completarReferencias({
+        supermercado,
+        desde: inicioActualizacion,
+        rastrear: (consultasFallback) =>
+          rastrearLoteLupa({
+            consultas: consultasFallback,
+            resultadosPorConsulta,
+            maxProductos: consultasFallback.length * resultadosPorConsulta,
+            permitirVacio: true,
+          }),
+        persistir: (productos, resultadoFallback, consultasFallback) =>
+          guardarRastreoLupa({
+            productos,
+            consultas: consultasFallback,
+            errores: resultadoFallback.errores,
+            tipoRastreo,
+          }),
+      });
+      return sumarReferencias(resumen, extra);
     }
   }
 }

@@ -13,21 +13,26 @@ export async function rastrearLoteBm({
   consultas,
   resultadosPorConsulta,
   maxProductos,
+  permitirVacio = false,
 }: {
   consultas: string[];
   resultadosPorConsulta: number;
   maxProductos: number;
+  permitirVacio?: boolean;
 }): Promise<{
   productos: ProductoBm[];
   peticionesRealizadas: number;
   errores: ErrorRastreoBm[];
+  resultadosPorConsulta: Record<string, number>;
 }> {
   const productos = new Map<string, ProductoBm>();
   const errores: ErrorRastreoBm[] = [];
+  const productosEncontradosPorConsulta: Record<string, number> = {};
   let peticionesRealizadas = 0;
 
   for (const consulta of consultas) {
     if (productos.size >= maxProductos) break;
+    productosEncontradosPorConsulta[consulta] = 0;
     if (peticionesRealizadas > 0) await esperar(PAUSA_ENTRE_PETICIONES_MS);
 
     try {
@@ -37,6 +42,7 @@ export async function rastrearLoteBm({
         limite: resultadosPorConsulta,
       });
       peticionesRealizadas += 1;
+      productosEncontradosPorConsulta[consulta] = resultado.productos.length;
 
       for (const producto of resultado.productos) {
         if (!productos.has(producto.identificadorExterno)) {
@@ -54,7 +60,7 @@ export async function rastrearLoteBm({
     }
   }
 
-  if (productos.size === 0) {
+  if (productos.size === 0 && !permitirVacio) {
     throw new Error("El rastreo de BM no devolvió ningún producto válido");
   }
 
@@ -62,5 +68,6 @@ export async function rastrearLoteBm({
     productos: [...productos.values()].slice(0, maxProductos),
     peticionesRealizadas,
     errores,
+    resultadosPorConsulta: productosEncontradosPorConsulta,
   };
 }

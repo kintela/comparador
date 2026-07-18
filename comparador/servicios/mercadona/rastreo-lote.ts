@@ -87,26 +87,31 @@ export async function rastrearLoteMercadona({
   resultadosPorConsulta,
   maxProductos,
   codigoPostal,
+  permitirVacio = false,
 }: {
   consultas: string[];
   resultadosPorConsulta: number;
   maxProductos: number;
   codigoPostal: string;
+  permitirVacio?: boolean;
 }): Promise<{
   productos: ProductoMercadona[];
   peticionesRealizadas: number;
   errores: ErrorRastreoMercadona[];
   zona: ZonaMercadona;
+  resultadosPorConsulta: Record<string, number>;
 }> {
   const zona = await resolverZonaMercadona(codigoPostal);
   const indice = await obtenerIndiceCategoriasMercadona(zona.almacen);
   const productos = new Map<string, ProductoMercadona>();
   const cacheCategorias = new Map<number, ProductoMercadona[]>();
   const errores: ErrorRastreoMercadona[] = [];
+  const productosEncontradosPorConsulta: Record<string, number> = {};
   let peticionesRealizadas = 2;
 
   for (const consulta of consultas) {
     if (productos.size >= maxProductos) break;
+    productosEncontradosPorConsulta[consulta] = 0;
     const categoriaIds = resolverCategorias(consulta, indice);
     if (categoriaIds.length === 0) {
       errores.push({
@@ -150,7 +155,9 @@ export async function rastrearLoteMercadona({
       const coincideB = normalizar(b.nombreOriginal).includes(consultaNormalizada);
       return Number(coincideB) - Number(coincideA);
     });
-    for (const producto of ordenados.slice(0, resultadosPorConsulta)) {
+    const encontrados = ordenados.slice(0, resultadosPorConsulta);
+    productosEncontradosPorConsulta[consulta] = encontrados.length;
+    for (const producto of encontrados) {
       if (!productos.has(producto.identificadorExterno)) {
         productos.set(producto.identificadorExterno, producto);
       }
@@ -158,7 +165,7 @@ export async function rastrearLoteMercadona({
     }
   }
 
-  if (productos.size === 0) {
+  if (productos.size === 0 && !permitirVacio) {
     throw new Error("El rastreo de Mercadona no devolvió ningún producto válido");
   }
 
@@ -167,5 +174,6 @@ export async function rastrearLoteMercadona({
     peticionesRealizadas,
     errores,
     zona,
+    resultadosPorConsulta: productosEncontradosPorConsulta,
   };
 }

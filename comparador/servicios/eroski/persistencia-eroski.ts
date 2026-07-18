@@ -1,6 +1,10 @@
 import "server-only";
 
 import type { TipoRastreo } from "@/servicios/rastreo/configuracion";
+import {
+  revertirAltasSinPrecio,
+  tienePrecioUtil,
+} from "@/servicios/rastreo/limpieza-persistencia";
 import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
 import { crearSlug } from "./categorias-eroski";
@@ -144,7 +148,7 @@ async function registrarErrores(
 }
 
 export async function guardarRastreoEroski({
-  productos,
+  productos: productosDetectados,
   consultas,
   errores,
   tipoRastreo = "manual",
@@ -154,6 +158,9 @@ export async function guardarRastreoEroski({
   errores: ErrorRastreoEroski[];
   tipoRastreo?: TipoRastreo;
 }): Promise<ResumenPersistenciaEroski> {
+  const productos = productosDetectados.filter((producto) =>
+    tienePrecioUtil(producto.precio),
+  );
   const supabase = obtenerSupabaseServidor();
   const contexto = await obtenerContextoEroski();
   const ahora = new Date().toISOString();
@@ -241,6 +248,14 @@ export async function guardarRastreoEroski({
     });
 
     let idsNormalizados: string[] = [];
+    const referenciasNuevasIds = (
+      (guardados ?? []) as ProductoSupermercadoGuardado[]
+    )
+      .filter(
+        (producto) =>
+          !identificadoresExistentes.has(producto.identificador_externo),
+      )
+      .map((producto) => producto.id);
     if (normalizadosNuevos.length > 0) {
       const { data, error } = await supabase
         .from("productos")
@@ -250,6 +265,11 @@ export async function guardarRastreoEroski({
       idsNormalizados = (data ?? []).map((producto) => producto.id);
 
       if (idsNormalizados.length !== pendientes.length) {
+        await revertirAltasSinPrecio({
+          supabase,
+          productosIds: idsNormalizados,
+          referenciasIds: referenciasNuevasIds,
+        });
         throw new Error("No se crearon todos los productos normalizados esperados");
       }
 
@@ -268,7 +288,14 @@ export async function guardarRastreoEroski({
           }),
           { onConflict: "cadena_supermercado_id,identificador_externo" },
         );
-      if (errorVinculos) throw errorVinculos;
+      if (errorVinculos) {
+        await revertirAltasSinPrecio({
+          supabase,
+          productosIds: idsNormalizados,
+          referenciasIds: referenciasNuevasIds,
+        });
+        throw errorVinculos;
+      }
     }
 
     const productoIdPorIdentificador = new Map(
@@ -295,7 +322,14 @@ export async function guardarRastreoEroski({
     });
 
     const { error: errorPrecios } = await supabase.from("precios").insert(precios);
-    if (errorPrecios) throw errorPrecios;
+    if (errorPrecios) {
+      await revertirAltasSinPrecio({
+        supabase,
+        productosIds: idsNormalizados,
+        referenciasIds: referenciasNuevasIds,
+      });
+      throw errorPrecios;
+    }
 
     await registrarErrores(ejecucion.id, contexto.cadenaId, errores);
 

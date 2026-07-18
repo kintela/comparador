@@ -13,23 +13,28 @@ export async function rastrearLoteDia({
   consultas,
   resultadosPorConsulta,
   maxProductos,
+  permitirVacio = false,
 }: {
   consultas: string[];
   resultadosPorConsulta: number;
   maxProductos: number;
+  permitirVacio?: boolean;
 }): Promise<{
   productos: ProductoDia[];
   peticionesRealizadas: number;
   errores: ErrorRastreoDia[];
   codigoPostal: string | null;
+  resultadosPorConsulta: Record<string, number>;
 }> {
   const productos = new Map<string, ProductoDia>();
   const errores: ErrorRastreoDia[] = [];
+  const productosEncontradosPorConsulta: Record<string, number> = {};
   let peticionesRealizadas = 0;
   let codigoPostal: string | null = null;
 
   for (const consulta of consultas) {
     if (productos.size >= maxProductos) break;
+    productosEncontradosPorConsulta[consulta] = 0;
     if (peticionesRealizadas > 0) await esperar(PAUSA_ENTRE_PETICIONES_MS);
 
     try {
@@ -38,6 +43,7 @@ export async function rastrearLoteDia({
         limite: Math.min(resultadosPorConsulta, maxProductos - productos.size),
       });
       peticionesRealizadas += resultado.peticionesRealizadas;
+      productosEncontradosPorConsulta[consulta] = resultado.productos.length;
       codigoPostal = resultado.codigoPostal ?? codigoPostal;
       for (const producto of resultado.productos) {
         productos.set(producto.identificadorExterno, producto);
@@ -53,7 +59,7 @@ export async function rastrearLoteDia({
     }
   }
 
-  if (productos.size === 0) {
+  if (productos.size === 0 && !permitirVacio) {
     throw new Error("El rastreo de DIA no devolvió ningún producto válido");
   }
 
@@ -62,5 +68,6 @@ export async function rastrearLoteDia({
     peticionesRealizadas,
     errores,
     codigoPostal,
+    resultadosPorConsulta: productosEncontradosPorConsulta,
   };
 }

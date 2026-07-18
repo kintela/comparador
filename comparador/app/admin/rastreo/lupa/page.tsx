@@ -6,7 +6,7 @@ export default function PaginaRastreoLupa() {
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-10 text-slate-100 sm:px-8">
       <div className="mx-auto max-w-7xl">
-        <Link href="/admin" className="text-sm text-slate-400 hover:text-white">
+        <Link href="/admin/rastreos" className="text-sm text-slate-400 hover:text-white">
           ← Volver a rastreadores
         </Link>
         <div className="mb-8 mt-6">

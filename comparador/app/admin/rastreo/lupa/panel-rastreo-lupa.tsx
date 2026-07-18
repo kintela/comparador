@@ -31,7 +31,6 @@ type ResultadoLupa = {
 };
 
 export function PanelRastreoLupa() {
-  const [token, setToken] = useState("");
   const [consultasTexto, setConsultasTexto] = useState(CONSULTAS_RASTREO_TEXTO);
   const [resultadosPorConsulta, setResultadosPorConsulta] = useState(10);
   const [maxProductos, setMaxProductos] = useState(250);
@@ -53,7 +52,6 @@ export function PanelRastreoLupa() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-token": token,
         },
         body: JSON.stringify({
           consultas: consultasTexto
@@ -90,20 +88,6 @@ export function PanelRastreoLupa() {
         className="h-fit rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl"
       >
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-slate-300">
-            Clave de administración
-          </span>
-          <input
-            type="password"
-            required
-            autoComplete="off"
-            value={token}
-            onChange={(evento) => setToken(evento.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 outline-none focus:border-fuchsia-400"
-          />
-        </label>
-
-        <label className="mt-5 block">
           <span className="mb-2 block text-sm font-medium text-slate-300">
             Búsquedas, una por línea
           </span>

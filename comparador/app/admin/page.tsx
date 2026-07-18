@@ -1,59 +1,21 @@
 import Link from "next/link";
 
-const RASTREADORES = [
+const AREAS = [
   {
-    nombre: "Solicitudes de productos",
-    descripcion: "Cola priorizada de búsquedas sin resultados pendientes de rastrear.",
-    href: "/admin/solicitudes-rastreo",
-    color: "border-violet-500/40 hover:border-violet-400",
-  },
-  {
-    nombre: "Eroski",
-    descripcion: "Catálogo y precios asociados a Eroski City Santurtzi.",
-    href: "/admin/rastreo",
+    nombre: "Rastreos",
+    descripcion:
+      "Ejecuta, revisa y controla los rastreadores de cada supermercado y las solicitudes pendientes.",
+    href: "/admin/rastreos",
     color: "border-emerald-500/40 hover:border-emerald-400",
+    etiqueta: "Operaciones",
   },
   {
-    nombre: "BM Supermercados",
-    descripcion: "Catálogo BM Online general, con EAN y promociones.",
-    href: "/admin/rastreo/bm",
-    color: "border-yellow-500/40 hover:border-yellow-400",
-  },
-  {
-    nombre: "Mercadona",
-    descripcion: "Catálogo asignado al código postal 48980, con precios por zona.",
-    href: "/admin/rastreo/mercadona",
-    color: "border-emerald-500/40 hover:border-emerald-400",
-  },
-  {
-    nombre: "ALDI",
-    descripcion: "Catálogo web de Península y ofertas semanales.",
-    href: "/admin/rastreo/aldi",
+    nombre: "Catálogo de productos",
+    descripcion:
+      "Consulta los productos catalogados, su cobertura por supermercado y gestiona los términos automáticos.",
+    href: "/admin/catalogo",
     color: "border-cyan-500/40 hover:border-cyan-400",
-  },
-  {
-    nombre: "DIA",
-    descripcion: "Catálogo oficial DIA Online, stock y promociones.",
-    href: "/admin/rastreo/dia",
-    color: "border-red-500/40 hover:border-red-400",
-  },
-  {
-    nombre: "Lidl",
-    descripcion: "Alimentación y ofertas publicadas para la región Vizcaya.",
-    href: "/admin/rastreo/lidl",
-    color: "border-blue-500/40 hover:border-blue-400",
-  },
-  {
-    nombre: "Alcampo",
-    descripcion: "Catálogo oficial Alcampo Online, precios y ofertas de folleto.",
-    href: "/admin/rastreo/alcampo",
-    color: "border-orange-500/40 hover:border-orange-400",
-  },
-  {
-    nombre: "Lupa",
-    descripcion: "Catálogo oficial Lupa Online para Santander y promociones.",
-    href: "/admin/rastreo/lupa",
-    color: "border-fuchsia-500/40 hover:border-fuchsia-400",
+    etiqueta: "Contenido",
   },
 ];
 
@@ -64,21 +26,29 @@ export default function PaginaAdmin() {
         <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-400">
           Comparador · Administración
         </p>
-        <h1 className="mt-3 text-4xl font-bold tracking-tight">Rastreadores</h1>
+        <h1 className="mt-3 text-4xl font-bold tracking-tight">
+          Panel de administración
+        </h1>
         <p className="mt-3 max-w-2xl text-slate-400">
-          Selecciona el supermercado que quieres previsualizar o actualizar.
+          Separa la operación de los rastreadores de la gestión del catálogo que
+          alimenta el comparador.
         </p>
 
-        <div className="mt-10 grid gap-5 md:grid-cols-2">
-          {RASTREADORES.map((rastreador) => (
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          {AREAS.map((area) => (
             <Link
-              key={rastreador.nombre}
-              href={rastreador.href}
-              className={`rounded-2xl border bg-slate-900 p-7 transition ${rastreador.color}`}
+              key={area.nombre}
+              href={area.href}
+              className={`group rounded-2xl border bg-slate-900 p-8 transition ${area.color}`}
             >
-              <h2 className="text-2xl font-bold">{rastreador.nombre}</h2>
-              <p className="mt-3 leading-7 text-slate-400">{rastreador.descripcion}</p>
-              <p className="mt-6 text-sm font-bold text-slate-200">Abrir rastreador →</p>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                {area.etiqueta}
+              </p>
+              <h2 className="mt-3 text-3xl font-bold">{area.nombre}</h2>
+              <p className="mt-4 leading-7 text-slate-400">{area.descripcion}</p>
+              <p className="mt-8 text-sm font-bold text-slate-200 transition group-hover:text-white">
+                Abrir área →
+              </p>
             </Link>
           ))}
         </div>

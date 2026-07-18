@@ -49,7 +49,6 @@ const RASTREADORES = [
 ] as const;
 
 export function PanelSolicitudesRastreo() {
-  const [token, setToken] = useState("");
   const [cargando, setCargando] = useState(false);
   const [colaCargada, setColaCargada] = useState(false);
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
@@ -65,9 +64,7 @@ export function PanelSolicitudesRastreo() {
     setRequiereMigracion(false);
     setColaCargada(false);
     try {
-      const respuesta = await fetch("/api/admin/solicitudes-rastreo", {
-        headers: { "x-admin-token": token },
-      });
+      const respuesta = await fetch("/api/admin/solicitudes-rastreo");
       const datos = (await respuesta.json()) as RespuestaCola;
       if (!datos.ok) {
         setError(datos.error ?? "No se pudo cargar la cola");
@@ -93,7 +90,6 @@ export function PanelSolicitudesRastreo() {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        "x-admin-token": token,
       },
       body: JSON.stringify({ id, estado, productosEncontrados, detalles }),
     });
@@ -142,7 +138,6 @@ export function PanelSolicitudesRastreo() {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-admin-token": token,
             },
             body: JSON.stringify(cuerpo),
           });
@@ -213,20 +208,11 @@ export function PanelSolicitudesRastreo() {
     <div>
       <form
         onSubmit={cargar}
-        className="mb-8 flex max-w-2xl flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:flex-row"
+        className="mb-8 flex max-w-2xl items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-5"
       >
-        <label className="min-w-0 flex-1">
-          <span className="sr-only">Clave de administración</span>
-          <input
-            type="password"
-            required
-            autoComplete="off"
-            value={token}
-            onChange={(evento) => setToken(evento.target.value)}
-            placeholder="Clave de administración"
-            className="h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 outline-none focus:border-violet-400"
-          />
-        </label>
+        <p className="text-sm text-slate-400">
+          Consulta las solicitudes pendientes con la sesión actual.
+        </p>
         <button
           type="submit"
           disabled={cargando || Boolean(procesandoId)}
@@ -256,7 +242,7 @@ export function PanelSolicitudesRastreo() {
         <div className="rounded-2xl border border-slate-800 bg-slate-900 px-6 py-16 text-center text-slate-500">
           {colaCargada
             ? "No hay solicitudes pendientes."
-            : "Introduce la clave y carga la cola de solicitudes."}
+            : "Carga la cola de solicitudes para consultar su estado."}
         </div>
       )}
 

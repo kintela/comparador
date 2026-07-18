@@ -2,6 +2,10 @@ import "server-only";
 
 import { crearSlug } from "@/servicios/eroski/categorias-eroski";
 import type { TipoRastreo } from "@/servicios/rastreo/configuracion";
+import {
+  revertirAltasSinPrecio,
+  tienePrecioUtil,
+} from "@/servicios/rastreo/limpieza-persistencia";
 import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
 import type { ProductoBm } from "./tipos-bm";
@@ -330,7 +334,7 @@ async function registrarErrores(
 }
 
 export async function guardarRastreoBm({
-  productos,
+  productos: productosDetectados,
   consultas,
   errores,
   tipoRastreo = "manual",
@@ -342,6 +346,9 @@ export async function guardarRastreoBm({
 },
 configuracion: ConfiguracionPersistenciaCatalogo = CONFIGURACION_BM,
 ): Promise<ResumenPersistenciaBm> {
+  const productos = productosDetectados.filter((producto) =>
+    tienePrecioUtil(producto.precio),
+  );
   const supabase = obtenerSupabaseServidor();
   const contexto = await obtenerContextoBm(configuracion);
   const ahora = new Date().toISOString();
@@ -466,6 +473,14 @@ configuracion: ConfiguracionPersistenciaCatalogo = CONFIGURACION_BM,
     });
 
     let idsNormalizados: string[] = [];
+    const referenciasNuevasIds = (
+      (guardados ?? []) as ProductoSupermercadoDb[]
+    )
+      .filter(
+        (producto) =>
+          !existentePorCodigo.has(producto.identificador_externo),
+      )
+      .map((producto) => producto.id);
     if (filasNormalizadas.length > 0) {
       const { data, error } = await supabase
         .from("productos")
@@ -474,6 +489,11 @@ configuracion: ConfiguracionPersistenciaCatalogo = CONFIGURACION_BM,
       if (error) throw error;
       idsNormalizados = (data ?? []).map((producto) => producto.id);
       if (idsNormalizados.length !== pendientes.length) {
+        await revertirAltasSinPrecio({
+          supabase,
+          productosIds: idsNormalizados,
+          referenciasIds: referenciasNuevasIds,
+        });
         throw new Error(
           `No se crearon todos los productos ${configuracion.nombreCadena} normalizados`,
         );
@@ -498,7 +518,14 @@ configuracion: ConfiguracionPersistenciaCatalogo = CONFIGURACION_BM,
           }),
           { onConflict: "cadena_supermercado_id,identificador_externo" },
         );
-      if (errorVinculos) throw errorVinculos;
+      if (errorVinculos) {
+        await revertirAltasSinPrecio({
+          supabase,
+          productosIds: idsNormalizados,
+          referenciasIds: referenciasNuevasIds,
+        });
+        throw errorVinculos;
+      }
     }
 
     const actualizacionesEan = productos.flatMap((producto) => {
@@ -545,7 +572,14 @@ configuracion: ConfiguracionPersistenciaCatalogo = CONFIGURACION_BM,
         : [];
     });
     const { error: errorPrecios } = await supabase.from("precios").insert(precios);
-    if (errorPrecios) throw errorPrecios;
+    if (errorPrecios) {
+      await revertirAltasSinPrecio({
+        supabase,
+        productosIds: idsNormalizados,
+        referenciasIds: referenciasNuevasIds,
+      });
+      throw errorPrecios;
+    }
 
     await registrarErrores(
       ejecucion.id,

@@ -33,7 +33,6 @@ type Resultado = {
 };
 
 export function PanelRastreoEroski() {
-  const [token, setToken] = useState("");
   const [consultasTexto, setConsultasTexto] = useState(CONSULTAS_RASTREO_TEXTO);
   const [paginas, setPaginas] = useState(1);
   const [maxProductos, setMaxProductos] = useState(250);
@@ -58,7 +57,6 @@ export function PanelRastreoEroski() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-token": token,
         },
         body: JSON.stringify({
           consultas,
@@ -88,21 +86,6 @@ export function PanelRastreoEroski() {
         className="h-fit rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl"
       >
         <div className="space-y-5">
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-300">
-              Clave de administración
-            </span>
-            <input
-              type="password"
-              autoComplete="off"
-              required
-              value={token}
-              onChange={(evento) => setToken(evento.target.value)}
-              placeholder="ADMIN_RASTREO_TOKEN"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm outline-none transition focus:border-emerald-500"
-            />
-          </label>
-
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-slate-300">
               Búsquedas, una por línea
@@ -166,10 +149,6 @@ export function PanelRastreoEroski() {
           </button>
         </div>
 
-        <p className="mt-4 text-xs leading-5 text-slate-500">
-          La clave se envía al servidor en una cabecera privada y no se guarda en el
-          navegador.
-        </p>
       </form>
 
       <section className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
