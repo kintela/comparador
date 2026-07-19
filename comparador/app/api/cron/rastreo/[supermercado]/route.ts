@@ -21,6 +21,8 @@ import { guardarRastreoLupa } from "@/servicios/lupa/persistencia-lupa";
 import { rastrearLoteLupa } from "@/servicios/lupa/rastreo-lote";
 import { guardarRastreoMercadona } from "@/servicios/mercadona/persistencia-mercadona";
 import { rastrearLoteMercadona } from "@/servicios/mercadona/rastreo-lote";
+import { guardarRastreoPrimaprix } from "@/servicios/primaprix/persistencia-primaprix";
+import { rastrearLotePrimaprix } from "@/servicios/primaprix/rastreo-lote";
 import {
   adquirirBloqueoRastreo,
   liberarBloqueoRastreo,
@@ -694,6 +696,40 @@ async function ejecutarRastreo(
           }),
         persistir: (productos, resultadoFallback, consultasFallback) =>
           guardarRastreoCostco({
+            productos,
+            consultas: consultasFallback,
+            errores: resultadoFallback.errores,
+            tipoRastreo,
+          }),
+      });
+      return sumarReferencias(resumen, extra);
+    }
+    case "primaprix": {
+      const resultado = await rastrearLotePrimaprix(parametros);
+      const persistencia = await guardarRastreoPrimaprix({
+        productos: resultado.productos,
+        consultas,
+        errores: resultado.errores,
+        tipoRastreo,
+      });
+      const procesadas = await guardarResultadosSolicitudes(
+        supermercado,
+        solicitudes,
+        resultado,
+      );
+      const resumen = crearResumen(resultado, persistencia, procesadas);
+      const extra = await completarReferencias({
+        supermercado,
+        desde: inicioActualizacion,
+        rastrear: (consultasFallback) =>
+          rastrearLotePrimaprix({
+            consultas: consultasFallback,
+            resultadosPorConsulta,
+            maxProductos: consultasFallback.length * resultadosPorConsulta,
+            permitirVacio: true,
+          }),
+        persistir: (productos, resultadoFallback, consultasFallback) =>
+          guardarRastreoPrimaprix({
             productos,
             consultas: consultasFallback,
             errores: resultadoFallback.errores,

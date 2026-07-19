@@ -54,6 +54,11 @@ const nextConfig: NextConfig = {
         hostname: "d2lnr5mha7bycj.cloudfront.net",
         pathname: "/product-image/**",
       },
+      {
+        protocol: "https",
+        hostname: "media.primaprix.eu",
+        pathname: "/primaprix-media/**",
+      },
     ],
   },
 };

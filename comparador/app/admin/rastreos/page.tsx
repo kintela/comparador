@@ -76,6 +76,13 @@ const RASTREADORES = [
     href: "/admin/rastreo/costco",
     color: "border-red-500/40 hover:border-red-400",
   },
+  {
+    nombre: "Primaprix",
+    descripcion:
+      "Oportunidades del catálogo web oficial, con Santurtzi como tienda de referencia.",
+    href: "/admin/rastreo/primaprix",
+    color: "border-pink-500/40 hover:border-pink-400",
+  },
 ];
 
 export default function PaginaRastreos() {

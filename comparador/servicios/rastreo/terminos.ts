@@ -15,6 +15,7 @@ export const SUPERMERCADOS_RASTREO = [
   "coviran",
   "carrefour",
   "costco",
+  "primaprix",
 ] as const;
 
 export type SupermercadoRastreo = (typeof SUPERMERCADOS_RASTREO)[number];

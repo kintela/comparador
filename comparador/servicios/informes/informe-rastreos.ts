@@ -15,6 +15,7 @@ const SUPERMERCADOS = [
   { slug: "coviran", nombre: "Covirán" },
   { slug: "carrefour", nombre: "Carrefour" },
   { slug: "costco", nombre: "Costco" },
+  { slug: "primaprix", nombre: "Primaprix" },
 ] as const;
 
 type EjecucionDb = {

@@ -49,6 +49,7 @@ const RASTREADORES = [
   { cadena: "Lupa", ruta: "lupa" },
   { cadena: "Covirán", ruta: "coviran" },
   { cadena: "Mercadona", ruta: "mercadona" },
+  { cadena: "Primaprix", ruta: "primaprix" },
 ] as const;
 
 export function PanelSolicitudesRastreo() {

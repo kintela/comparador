@@ -53,6 +53,7 @@ const SUPERMERCADOS = [
   "Lidl",
   "Lupa",
   "Mercadona",
+  "Primaprix",
 ] as const;
 const COLUMNAS_RESULTADOS = {
   3: "md:grid-cols-3",
