@@ -9,6 +9,7 @@ type ProductoSupermercadoDb = {
   id: string;
   producto_id: string | null;
   nombre_original: string;
+  codigo_ean: string | null;
   url_imagen: string | null;
   url_producto: string | null;
   productos: {
@@ -101,7 +102,7 @@ export async function GET(request: Request) {
       ? await resolverTerminoRastreo(consulta)
       : null;
     const seleccionProductos =
-      "id, producto_id, nombre_original, url_imagen, url_producto, productos(nombre, marcas(nombre), categorias(nombre)), cadenas_supermercados(nombre)";
+      "id, producto_id, nombre_original, codigo_ean, url_imagen, url_producto, productos(nombre, marcas(nombre), categorias(nombre)), cadenas_supermercados(nombre)";
 
     let idsConPromocion: string[] | null = null;
     if (soloOfertas && !consulta) {
@@ -237,7 +238,11 @@ export async function GET(request: Request) {
       const agrupado = agrupados.get(claveProducto) ?? {
         id: claveProducto,
         nombre: producto.productos?.nombre ?? producto.nombre_original,
-        imagen: producto.url_imagen,
+        imagen:
+          producto.cadenas_supermercados?.nombre === "Carrefour" &&
+          producto.codigo_ean
+            ? `/api/imagenes/carrefour?ean=${encodeURIComponent(producto.codigo_ean)}`
+            : producto.url_imagen,
         marca: producto.productos?.marcas?.nombre ?? null,
         categoria: producto.productos?.categorias?.nombre ?? null,
         ofertas: [],

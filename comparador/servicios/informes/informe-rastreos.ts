@@ -13,6 +13,7 @@ const SUPERMERCADOS = [
   { slug: "alcampo", nombre: "Alcampo" },
   { slug: "lupa", nombre: "Lupa" },
   { slug: "coviran", nombre: "Covirán" },
+  { slug: "carrefour", nombre: "Carrefour" },
 ] as const;
 
 type EjecucionDb = {
@@ -125,7 +126,7 @@ function crearHtml(fecha: string, filas: FilaInforme[]): string {
           <h1 style="margin:10px 0 6px;font-size:28px">Informe diario de rastreos</h1>
           <p style="margin:0 0 24px;color:#64748b">Ejecuciones automáticas del ${escaparHtml(fecha)}.</p>
           <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">
-            <span style="padding:10px 14px;background:#ecfdf5;border-radius:10px"><strong>${correctos}/8</strong> completados sin errores</span>
+            <span style="padding:10px 14px;background:#ecfdf5;border-radius:10px"><strong>${correctos}/${SUPERMERCADOS.length}</strong> completados sin errores</span>
             <span style="padding:10px 14px;background:#f8fafc;border-radius:10px"><strong>${productos}</strong> productos</span>
             <span style="padding:10px 14px;background:#f8fafc;border-radius:10px"><strong>${precios}</strong> precios</span>
             <span style="padding:10px 14px;background:#f8fafc;border-radius:10px"><strong>${errores}</strong> errores</span>

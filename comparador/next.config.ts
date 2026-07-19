@@ -44,6 +44,11 @@ const nextConfig: NextConfig = {
         hostname: "www.lupaonline.com",
         pathname: "/media/catalog/product/**",
       },
+      {
+        protocol: "https",
+        hostname: "static.carrefour.es",
+        pathname: "/**",
+      },
     ],
   },
 };

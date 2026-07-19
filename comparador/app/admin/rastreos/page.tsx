@@ -62,6 +62,13 @@ const RASTREADORES = [
     href: "/admin/rastreo/coviran",
     color: "border-violet-500/40 hover:border-violet-400",
   },
+  {
+    nombre: "Carrefour",
+    descripcion:
+      "Catálogo oficial para 48980 y el punto de venta 005457, con EAN y ofertas.",
+    href: "/admin/rastreo/carrefour",
+    color: "border-blue-500/40 hover:border-blue-400",
+  },
 ];
 
 export default function PaginaRastreos() {

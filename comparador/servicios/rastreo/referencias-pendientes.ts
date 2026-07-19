@@ -13,6 +13,7 @@ const SLUG_CADENA: Record<SupermercadoRastreo, string> = {
   alcampo: "alcampo",
   lupa: "lupa",
   coviran: "coviran",
+  carrefour: "carrefour",
 };
 
 export type ReferenciaPendiente = {

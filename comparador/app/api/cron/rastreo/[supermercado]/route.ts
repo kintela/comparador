@@ -4,6 +4,8 @@ import { guardarRastreoAldi } from "@/servicios/aldi/persistencia-aldi";
 import { rastrearLoteAldi } from "@/servicios/aldi/rastreo-lote";
 import { guardarRastreoBm } from "@/servicios/bm/persistencia-bm";
 import { rastrearLoteBm } from "@/servicios/bm/rastreo-lote";
+import { guardarRastreoCarrefour } from "@/servicios/carrefour/persistencia-carrefour";
+import { rastrearLoteCarrefour } from "@/servicios/carrefour/rastreo-lote";
 import { guardarRastreoCoviran } from "@/servicios/coviran/persistencia-coviran";
 import { rastrearLoteCoviran } from "@/servicios/coviran/rastreo-lote";
 import { autorizarCron } from "@/servicios/cron/autorizacion";
@@ -622,6 +624,40 @@ async function ejecutarRastreo(
           }),
         persistir: (productos, resultadoFallback, consultasFallback) =>
           guardarRastreoCoviran({
+            productos,
+            consultas: consultasFallback,
+            errores: resultadoFallback.errores,
+            tipoRastreo,
+          }),
+      });
+      return sumarReferencias(resumen, extra);
+    }
+    case "carrefour": {
+      const resultado = await rastrearLoteCarrefour(parametros);
+      const persistencia = await guardarRastreoCarrefour({
+        productos: resultado.productos,
+        consultas,
+        errores: resultado.errores,
+        tipoRastreo,
+      });
+      const procesadas = await guardarResultadosSolicitudes(
+        supermercado,
+        solicitudes,
+        resultado,
+      );
+      const resumen = crearResumen(resultado, persistencia, procesadas);
+      const extra = await completarReferencias({
+        supermercado,
+        desde: inicioActualizacion,
+        rastrear: (consultasFallback) =>
+          rastrearLoteCarrefour({
+            consultas: consultasFallback,
+            resultadosPorConsulta,
+            maxProductos: consultasFallback.length * resultadosPorConsulta,
+            permitirVacio: true,
+          }),
+        persistir: (productos, resultadoFallback, consultasFallback) =>
+          guardarRastreoCarrefour({
             productos,
             consultas: consultasFallback,
             errores: resultadoFallback.errores,

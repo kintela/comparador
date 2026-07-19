@@ -45,6 +45,7 @@ const SUPERMERCADOS = [
   "Alcampo",
   "ALDI",
   "BM Supermercados",
+  "Carrefour",
   "Covirán",
   "DIA",
   "Eroski",
@@ -61,12 +62,22 @@ const COLUMNAS_RESULTADOS = {
 type NumeroColumnas = keyof typeof COLUMNAS_RESULTADOS;
 
 function requiereCargaDirecta(url: string) {
-  if (url.startsWith("/api/imagenes/coviran")) return true;
+  if (
+    url.startsWith("/api/imagenes/coviran") ||
+    url.startsWith("/api/imagenes/carrefour")
+  ) {
+    return true;
+  }
   try {
     return new URL(url).hostname === "www.lupaonline.com";
   } catch {
     return false;
   }
+}
+
+function obtenerEanImagenCarrefour(url: string | null) {
+  if (!url?.startsWith("/api/imagenes/carrefour?")) return null;
+  return new URLSearchParams(url.split("?")[1]).get("ean");
 }
 
 export function BuscadorProductos() {
@@ -368,6 +379,7 @@ function ProductoCard({
   compacta?: boolean;
 }) {
   const ofertas = [...producto.ofertas].sort((a, b) => a.precio - b.precio);
+  const eanImagenCarrefour = obtenerEanImagenCarrefour(producto.imagen);
 
   return (
     <article
@@ -384,14 +396,26 @@ function ProductoCard({
           }
         >
           {producto.imagen ? (
-            <Image
-              src={producto.imagen}
-              alt={producto.nombre}
-              fill
-              unoptimized={requiereCargaDirecta(producto.imagen)}
-              sizes={compacta ? "(min-width: 1024px) 20vw, 50vw" : "112px"}
-              className="object-contain p-2"
-            />
+            <>
+              <Image
+                src={producto.imagen}
+                alt={producto.nombre}
+                fill
+                unoptimized={requiereCargaDirecta(producto.imagen)}
+                sizes={compacta ? "(min-width: 1024px) 20vw, 50vw" : "112px"}
+                className="object-contain p-2"
+              />
+              {eanImagenCarrefour && (
+                <a
+                  href={`https://world.openfoodfacts.org/product/${encodeURIComponent(eanImagenCarrefour)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="absolute bottom-1 right-1 rounded bg-white/90 px-1.5 py-0.5 text-[8px] font-medium text-[#71837c] hover:text-[#176b50]"
+                >
+                  Open Food Facts
+                </a>
+              )}
+            </>
           ) : (
             <div className="grid h-full place-items-center text-3xl text-[#9eaaa5]">€</div>
           )}
