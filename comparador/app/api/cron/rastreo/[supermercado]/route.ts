@@ -8,6 +8,8 @@ import { guardarRastreoCarrefour } from "@/servicios/carrefour/persistencia-carr
 import { rastrearLoteCarrefour } from "@/servicios/carrefour/rastreo-lote";
 import { guardarRastreoCoviran } from "@/servicios/coviran/persistencia-coviran";
 import { rastrearLoteCoviran } from "@/servicios/coviran/rastreo-lote";
+import { guardarRastreoCostco } from "@/servicios/costco/persistencia-costco";
+import { rastrearLoteCostco } from "@/servicios/costco/rastreo-lote";
 import { autorizarCron } from "@/servicios/cron/autorizacion";
 import { guardarRastreoDia } from "@/servicios/dia/persistencia-dia";
 import { rastrearLoteDia } from "@/servicios/dia/rastreo-lote";
@@ -658,6 +660,40 @@ async function ejecutarRastreo(
           }),
         persistir: (productos, resultadoFallback, consultasFallback) =>
           guardarRastreoCarrefour({
+            productos,
+            consultas: consultasFallback,
+            errores: resultadoFallback.errores,
+            tipoRastreo,
+          }),
+      });
+      return sumarReferencias(resumen, extra);
+    }
+    case "costco": {
+      const resultado = await rastrearLoteCostco(parametros);
+      const persistencia = await guardarRastreoCostco({
+        productos: resultado.productos,
+        consultas,
+        errores: resultado.errores,
+        tipoRastreo,
+      });
+      const procesadas = await guardarResultadosSolicitudes(
+        supermercado,
+        solicitudes,
+        resultado,
+      );
+      const resumen = crearResumen(resultado, persistencia, procesadas);
+      const extra = await completarReferencias({
+        supermercado,
+        desde: inicioActualizacion,
+        rastrear: (consultasFallback) =>
+          rastrearLoteCostco({
+            consultas: consultasFallback,
+            resultadosPorConsulta,
+            maxProductos: consultasFallback.length * resultadosPorConsulta,
+            permitirVacio: true,
+          }),
+        persistir: (productos, resultadoFallback, consultasFallback) =>
+          guardarRastreoCostco({
             productos,
             consultas: consultasFallback,
             errores: resultadoFallback.errores,

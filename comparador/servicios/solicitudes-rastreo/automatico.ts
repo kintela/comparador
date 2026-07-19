@@ -15,6 +15,7 @@ const NOMBRE_POR_SUPERMERCADO: Record<SupermercadoRastreo, string> = {
   lupa: "Lupa",
   coviran: "Covirán",
   carrefour: "Carrefour",
+  costco: "Costco",
 };
 
 type ProgresoSolicitud = {

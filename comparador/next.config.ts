@@ -49,6 +49,11 @@ const nextConfig: NextConfig = {
         hostname: "static.carrefour.es",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "d2lnr5mha7bycj.cloudfront.net",
+        pathname: "/product-image/**",
+      },
     ],
   },
 };

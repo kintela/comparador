@@ -46,6 +46,7 @@ const SUPERMERCADOS = [
   "ALDI",
   "BM Supermercados",
   "Carrefour",
+  "Costco",
   "Covirán",
   "DIA",
   "Eroski",

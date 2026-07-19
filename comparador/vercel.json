@@ -42,8 +42,12 @@
       "schedule": "5 9 * * *"
     },
     {
+      "path": "/api/cron/rastreo/costco",
+      "schedule": "5 10 * * *"
+    },
+    {
       "path": "/api/cron/informe-rastreos",
-      "schedule": "30 10 * * *"
+      "schedule": "30 11 * * *"
     }
   ]
 }

@@ -14,6 +14,7 @@ export const SUPERMERCADOS_RASTREO = [
   "lupa",
   "coviran",
   "carrefour",
+  "costco",
 ] as const;
 
 export type SupermercadoRastreo = (typeof SUPERMERCADOS_RASTREO)[number];

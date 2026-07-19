@@ -69,6 +69,13 @@ const RASTREADORES = [
     href: "/admin/rastreo/carrefour",
     color: "border-blue-500/40 hover:border-blue-400",
   },
+  {
+    nombre: "Costco",
+    descripcion:
+      "Catálogo Same-Day y precios del almacén Costco - Bilbao de Sestao.",
+    href: "/admin/rastreo/costco",
+    color: "border-red-500/40 hover:border-red-400",
+  },
 ];
 
 export default function PaginaRastreos() {
