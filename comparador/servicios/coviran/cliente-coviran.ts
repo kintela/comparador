@@ -398,6 +398,19 @@ async function descargarCatalogo(): Promise<CatalogoCoviran> {
     throw new Error(`Covirán respondió con estado ${respuesta.status}`);
   }
 
+  // PDF.js carga este paquete de forma opcional mediante require(). Ese acceso
+  // dinámico no siempre es detectado por el empaquetado de Vercel, por lo que
+  // lo importamos expresamente y registramos los polyfills antes de PDF.js.
+  const canvas = await import("@napi-rs/canvas");
+  if (!globalThis.DOMMatrix) {
+    globalThis.DOMMatrix = canvas.DOMMatrix as typeof DOMMatrix;
+  }
+  if (!globalThis.Path2D) {
+    globalThis.Path2D = canvas.Path2D as typeof Path2D;
+  }
+  if (!globalThis.ImageData) {
+    globalThis.ImageData = canvas.ImageData as unknown as typeof ImageData;
+  }
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const documento = await getDocument({
     data: new Uint8Array(await respuesta.arrayBuffer()),
