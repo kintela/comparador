@@ -27,6 +27,29 @@ function variantesConsulta(consulta: string) {
   return [...variantes].filter(Boolean);
 }
 
+function singularizarPalabra(palabra: string) {
+  if (palabra.length > 4 && palabra.endsWith("es")) {
+    return palabra.slice(0, -2);
+  }
+  if (palabra.length > 3 && palabra.endsWith("s")) {
+    return palabra.slice(0, -1);
+  }
+  return palabra;
+}
+
+function contienePalabrasCompletas(nombre: string, variante: string) {
+  const palabrasNombre = nombre.split(" ").map(singularizarPalabra);
+  const palabrasVariante = variante.split(" ").map(singularizarPalabra);
+  if (palabrasVariante.length === 0) return false;
+
+  return palabrasNombre.some((_, inicio) =>
+    palabrasVariante.every(
+      (palabra, desplazamiento) =>
+        palabrasNombre[inicio + desplazamiento] === palabra,
+    ),
+  );
+}
+
 export function puntuacionRelevanciaProducto(
   nombreProducto: string,
   consulta: string,
@@ -45,8 +68,9 @@ export function puntuacionRelevanciaProducto(
       comienzaPorConsulta = true;
       mejor = Math.max(mejor, 800);
     }
-    else if (` ${nombre} `.includes(` ${variante} `)) mejor = Math.max(mejor, 400);
-    else if (nombre.includes(variante)) mejor = Math.max(mejor, 200);
+    else if (contienePalabrasCompletas(nombre, variante)) {
+      mejor = Math.max(mejor, 400);
+    }
   }
 
   if (obtenerCategoriaSugerida(consulta) === "Frutas") {

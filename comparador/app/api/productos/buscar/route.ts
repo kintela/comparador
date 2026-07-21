@@ -59,6 +59,12 @@ type CadenaSeleccionada = {
   nombre: string;
 };
 
+function imagenCarrefourConVersion(url: string | null, ean: string | null) {
+  return ean
+    ? `/api/imagenes/carrefour?ean=${encodeURIComponent(ean)}&v=3`
+    : url;
+}
+
 async function respuestaSinProductos({
   request,
   consulta,
@@ -364,9 +370,11 @@ export async function GET(request: Request) {
         id: claveProducto,
         nombre: producto.productos?.nombre ?? producto.nombre_original,
         imagen:
-          producto.cadenas_supermercados?.nombre === "Carrefour" &&
-          producto.codigo_ean
-            ? `/api/imagenes/carrefour?ean=${encodeURIComponent(producto.codigo_ean)}`
+          producto.cadenas_supermercados?.nombre === "Carrefour"
+            ? imagenCarrefourConVersion(
+                producto.url_imagen,
+                producto.codigo_ean,
+              )
             : producto.url_imagen,
         marca: producto.productos?.marcas?.nombre ?? null,
         categoria:

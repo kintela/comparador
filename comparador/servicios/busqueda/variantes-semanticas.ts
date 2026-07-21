@@ -8,6 +8,7 @@ const VARIANTES_POR_TERMINO: Record<string, string[]> = {
     "gel lavadora",
     "polvo lavadora",
   ],
+  gula: ["angula", "angulas"],
 };
 
 function singularizar(termino: string) {

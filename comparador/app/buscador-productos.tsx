@@ -76,7 +76,10 @@ function requiereCargaDirecta(url: string) {
     return true;
   }
   try {
-    return new URL(url).hostname === "www.lupaonline.com";
+    return [
+      "www.lupaonline.com",
+      "www.compraonline.alcampo.es",
+    ].includes(new URL(url).hostname);
   } catch {
     return false;
   }
@@ -308,39 +311,6 @@ export function BuscadorProductos() {
 
         {resultado?.ok && productosOrdenados.length > 0 && (
           <div>
-            {((resultado.cobertura?.pendientes.length ?? 0) > 0 ||
-              (resultado.cobertura?.sinResultadosRecientes.length ?? 0) > 0) && (
-              <div className="mb-6 rounded-2xl border border-[#d89a22]/30 bg-[#fff8e8] px-5 py-4 text-sm text-[#7a530c]">
-                <p className="font-bold">
-                  Estado de cobertura de esta búsqueda
-                </p>
-                <p className="mt-1 leading-6">
-                  Ya hay precios en{" "}
-                  {resultado.cobertura?.encontrados.join(", ") ||
-                    "el catálogo actual"}
-                  .
-                </p>
-                {(resultado.cobertura?.sinResultadosRecientes.length ?? 0) >
-                  0 && (
-                  <p className="mt-1 leading-6">
-                    Rastreados recientemente sin resultados:{" "}
-                    <span className="font-semibold">
-                      {resultado.cobertura?.sinResultadosRecientes.join(", ")}
-                    </span>
-                    .
-                  </p>
-                )}
-                {(resultado.cobertura?.pendientes.length ?? 0) > 0 && (
-                  <p className="mt-1 leading-6">
-                    Hemos añadido a la cola:{" "}
-                    <span className="font-semibold">
-                      {resultado.cobertura?.pendientes.join(", ")}
-                    </span>
-                    .
-                  </p>
-                )}
-              </div>
-            )}
             <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-[#16805e]">Resultados</p>

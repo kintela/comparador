@@ -51,6 +51,8 @@ function convertirProducto(
   const ruta =
     producto.url_for_play_service ?? producto.urls?.food ?? "/supermercado/";
   const ean = producto.ean13?.trim() || null;
+  const imagenOficial =
+    producto.image_for_play_service ?? producto.image_path?.food ?? null;
 
   return {
     identificadorExterno: identificador,
@@ -70,9 +72,9 @@ function convertirProducto(
     disponible:
       producto.sale_point_available !== false && producto.active_food !== false,
     urlProducto: ruta.startsWith("http") ? ruta : `${ORIGEN_CARREFOUR}${ruta}`,
-    urlImagen: ean
-      ? `/api/imagenes/carrefour?ean=${encodeURIComponent(ean)}`
-      : null,
+    urlImagen:
+      imagenOficial ??
+      (ean ? `/api/imagenes/carrefour?ean=${encodeURIComponent(ean)}` : null),
   };
 }
 

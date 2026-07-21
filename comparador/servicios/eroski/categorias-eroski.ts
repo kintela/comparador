@@ -15,6 +15,7 @@ const CATEGORIAS_POR_BUSQUEDA: Record<string, string> = {
   pollo: "Pollo y aves",
   carne: "Carne",
   pescado: "Pescado y marisco",
+  gula: "Pescado y marisco",
   verduras: "Verduras y hortalizas",
   fruta: "Frutas",
   mandarina: "Frutas",

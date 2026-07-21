@@ -2,6 +2,60 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ORIGEN_OPEN_FOOD_FACTS = "https://world.openfoodfacts.org";
+const ENDPOINT_BUSQUEDA_CARREFOUR =
+  "https://api.empathy.co/search/v1/query/carrefour/search";
+const PUNTO_VENTA_CARREFOUR =
+  process.env.CARREFOUR_STORE_ID?.trim() || "005457";
+
+type ProductoCarrefourImagen = {
+  ean13?: string;
+  image_for_play_service?: string;
+  image_path?: { food?: string };
+};
+
+function esImagenOficialCarrefour(url: string | undefined): url is string {
+  if (!url) return false;
+  try {
+    const imagen = new URL(url);
+    return imagen.protocol === "https:" && imagen.hostname === "static.carrefour.es";
+  } catch {
+    return false;
+  }
+}
+
+async function buscarImagenOficial(ean: string): Promise<string | null> {
+  const url = new URL(ENDPOINT_BUSQUEDA_CARREFOUR);
+  for (const [clave, valor] of Object.entries({
+    query: ean,
+    lang: "es",
+    scope: "desktop",
+    store: PUNTO_VENTA_CARREFOUR,
+    catalog: "food",
+    rows: "10",
+    start: "0",
+  })) {
+    url.searchParams.set(clave, valor);
+  }
+  const respuesta = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "Mozilla/5.0 ComparadorKintela/1.0",
+    },
+    next: { revalidate: 604800 },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!respuesta.ok) return null;
+
+  const datos = (await respuesta.json()) as {
+    catalog?: { content?: ProductoCarrefourImagen[] };
+  };
+  const producto = datos.catalog?.content?.find(
+    (item) => item.ean13?.trim() === ean,
+  );
+  const imagen =
+    producto?.image_for_play_service ?? producto?.image_path?.food;
+  return esImagenOficialCarrefour(imagen) ? imagen : null;
+}
 
 function marcadorSinImagen() {
   const svg = `
@@ -16,7 +70,7 @@ function marcadorSinImagen() {
   return new Response(svg, {
     headers: {
       "Content-Type": "image/svg+xml; charset=utf-8",
-      "Cache-Control": "public, max-age=86400, s-maxage=604800",
+      "Cache-Control": "no-store, max-age=0",
     },
   });
 }
@@ -39,25 +93,28 @@ export async function GET(request: Request) {
       next: { revalidate: 604800 },
       signal: AbortSignal.timeout(10_000),
     });
-    if (!respuesta.ok) return marcadorSinImagen();
-
-    const datos = (await respuesta.json()) as {
-      status?: number;
-      product?: {
-        image_front_url?: string;
-        image_front_small_url?: string;
-        image_url?: string;
+    if (respuesta.ok) {
+      const datos = (await respuesta.json()) as {
+        status?: number;
+        product?: {
+          image_front_url?: string;
+          image_front_small_url?: string;
+          image_url?: string;
+        };
       };
-    };
-    const imagen =
-      datos.product?.image_front_url ??
-      datos.product?.image_front_small_url ??
-      datos.product?.image_url;
-    if (datos.status !== 1 || !imagen?.startsWith("https://")) {
-      return marcadorSinImagen();
+      const imagen =
+        datos.product?.image_front_url ??
+        datos.product?.image_front_small_url ??
+        datos.product?.image_url;
+      if (datos.status === 1 && imagen?.startsWith("https://")) {
+        return Response.redirect(imagen, 307);
+      }
     }
 
-    return Response.redirect(imagen, 307);
+    const imagenCarrefour = await buscarImagenOficial(ean);
+    return imagenCarrefour
+      ? Response.redirect(imagenCarrefour, 307)
+      : marcadorSinImagen();
   } catch {
     return marcadorSinImagen();
   }

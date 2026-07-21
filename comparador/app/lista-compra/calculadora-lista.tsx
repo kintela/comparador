@@ -86,6 +86,21 @@ function normalizarTermino(termino: string) {
     .trim();
 }
 
+function esProductoAdecuadoParaLista(
+  nombreProducto: string,
+  consulta: string,
+) {
+  const termino = normalizarTermino(consulta);
+  if (!["brocoli", "brocolis"].includes(termino)) return true;
+
+  const nombre = normalizarTermino(nombreProducto);
+  if (!/\bbrocolis?\b/.test(nombre)) return false;
+
+  return !/\b(coliflor|zanahoria|pescado|filete|cobertura|mezcla|mix|crema|sopa|pure|tortilla|pizza|pasta|arroz|espinaca|platano|pina|smoothie|tarrito|ensalada|kit)\b/.test(
+    nombre,
+  );
+}
+
 function moneda(valor: number) {
   return valor.toLocaleString("es-ES", {
     style: "currency",
@@ -142,6 +157,7 @@ export function CalculadoraLista() {
       let total = 0;
       let encontrados = 0;
       let estimado = false;
+      let comparable = false;
 
       for (const articulo of articulos) {
         const resultado = resultados.find(
@@ -159,6 +175,7 @@ export function CalculadoraLista() {
         });
         total += calculo.total;
         estimado ||= calculo.estimado;
+        comparable ||= calculo.normalizado;
         encontrados += 1;
       }
 
@@ -167,14 +184,11 @@ export function CalculadoraLista() {
         total,
         encontrados,
         estimado,
+        comparable,
         completa: articulos.length > 0 && encontrados === articulos.length,
       };
     });
   }, [articulos, resultados]);
-
-  const totalMasBarato = Math.min(
-    ...totales.filter((total) => total.completa).map((total) => total.total),
-  );
 
   function anadirArticulos(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
@@ -257,6 +271,14 @@ export function CalculadoraLista() {
           const precios: Record<string, MejorPrecio> = {};
           const productos = datos.productos ?? [];
           for (const producto of productos) {
+            if (
+              !esProductoAdecuadoParaLista(
+                producto.nombre,
+                articulo.termino,
+              )
+            ) {
+              continue;
+            }
             const relevancia = puntuacionRelevanciaProducto(
               producto.nombre,
               articulo.termino,
@@ -482,7 +504,6 @@ export function CalculadoraLista() {
           articulos={articulos}
           resultados={resultados}
           totales={totales}
-          totalMasBarato={totalMasBarato}
         />
       )}
     </div>
@@ -503,7 +524,6 @@ function TablaComparacion({
   articulos,
   resultados,
   totales,
-  totalMasBarato,
 }: {
   articulos: ArticuloLista[];
   resultados: ResultadoArticulo[];
@@ -512,13 +532,28 @@ function TablaComparacion({
     total: number;
     encontrados: number;
     estimado: boolean;
+    comparable: boolean;
     completa: boolean;
   }>;
-  totalMasBarato: number;
 }) {
-  const completas = totales.filter((total) => total.completa);
+  const [supermercadosVisibles, setSupermercadosVisibles] = useState<string[]>([
+    ...SUPERMERCADOS,
+  ]);
+  const visibles = SUPERMERCADOS.filter((supermercado) =>
+    supermercadosVisibles.includes(supermercado),
+  );
+  const totalesVisibles = totales.filter((total) =>
+    supermercadosVisibles.includes(total.supermercado),
+  );
+  const completas = totalesVisibles.filter((total) => total.completa);
+  const totalMasBarato = Math.min(
+    ...completas.map((total) => total.total),
+  );
   const ganadores = completas.filter(
     (total) => total.total === totalMasBarato,
+  );
+  const usaCantidadesComparables = completas.some(
+    (total) => total.comparable,
   );
   const contenedorTabla = useRef<HTMLDivElement>(null);
 
@@ -542,9 +577,13 @@ function TablaComparacion({
         </div>
         {completas.length > 0 ? (
           <div className="rounded-2xl bg-[#e7f5ee] px-5 py-3 text-right">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#16805e]">Mejor total completo</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#16805e]">
+              {usaCantidadesComparables
+                ? "Mejor total comparable"
+                : "Mejor total completo"}
+            </p>
             <p className="mt-1 text-2xl font-extrabold text-[#176b50]">
-              {totales.some(
+              {totalesVisibles.some(
                 (total) =>
                   total.completa &&
                   total.total === totalMasBarato &&
@@ -566,9 +605,20 @@ function TablaComparacion({
       </div>
 
       <div className="flex items-center justify-between gap-3 border-b border-[#17352b]/10 bg-[#f7f5ee]/70 px-5 py-3 sm:px-7">
-        <p className="text-xs font-semibold text-[#60766e]">
-          Desplázate horizontalmente para ver todos los supermercados
-        </p>
+        <div>
+          <p className="text-xs font-semibold text-[#60766e]">
+            Desplázate horizontalmente para ver todos los supermercados
+          </p>
+          {visibles.length < SUPERMERCADOS.length && (
+            <button
+              type="button"
+              onClick={() => setSupermercadosVisibles([...SUPERMERCADOS])}
+              className="mt-1 text-xs font-bold text-[#176b50] hover:underline"
+            >
+              Mostrar todos ({SUPERMERCADOS.length - visibles.length} ocultos)
+            </button>
+          )}
+        </div>
         <div className="flex shrink-0 gap-2">
           <button
             type="button"
@@ -601,9 +651,25 @@ function TablaComparacion({
               <th className="sticky left-0 z-20 min-w-56 border-b border-r border-[#17352b]/10 bg-[#f7f5ee] px-5 py-4 text-sm font-bold">
                 Producto
               </th>
-              {SUPERMERCADOS.map((supermercado) => (
+              {visibles.map((supermercado) => (
                 <th key={supermercado} className="min-w-40 border-b border-[#17352b]/10 px-4 py-4 text-center text-sm font-bold">
-                  {supermercado}
+                  <div className="flex items-center justify-center gap-2">
+                    <span>{supermercado}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSupermercadosVisibles((actuales) =>
+                          actuales.filter((nombre) => nombre !== supermercado),
+                        )
+                      }
+                      disabled={visibles.length === 1}
+                      aria-label={`Ocultar ${supermercado}`}
+                      title={`Ocultar ${supermercado}`}
+                      className="grid size-6 shrink-0 place-items-center rounded-md border border-[#17352b]/15 bg-white text-sm font-bold text-[#71837c] transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </th>
               ))}
             </tr>
@@ -625,7 +691,7 @@ function TablaComparacion({
                     {resultado?.enCola && <p className="mt-2 text-xs font-semibold text-[#a56600]">Añadido a la cola de rastreo</p>}
                     {resultado?.error && <p className="mt-2 max-w-48 text-xs font-semibold text-red-600">{resultado.error}</p>}
                   </th>
-                  {SUPERMERCADOS.map((supermercado) => {
+                  {visibles.map((supermercado) => {
                     const precio = resultado?.precios[supermercado];
                     const calculo = precio
                       ? calcularCosteArticulo({
@@ -652,7 +718,22 @@ function TablaComparacion({
                                 {moneda(calculo?.total ?? 0)}
                               </p>
                             )}
-                            {calculo?.estimado ? (
+                            {calculo?.normalizado ? (
+                              <>
+                                <p className="mt-1 text-xs font-semibold text-[#16805e]">
+                                  por {calculo.cantidadComparableTexto}
+                                </p>
+                                <p className="mt-1 text-xs text-[#71837c]">
+                                  Envase: {moneda(precio.precio)}
+                                  {calculo.cantidadEnvaseTexto
+                                    ? ` · ${calculo.cantidadEnvaseTexto}`
+                                    : ""}
+                                </p>
+                                <p className="mt-1 text-xs text-[#71837c]">
+                                  {moneda(calculo.precioKg ?? 0)} / kg
+                                </p>
+                              </>
+                            ) : calculo?.estimado ? (
                               <>
                                 <p className="mt-1 text-xs font-semibold text-[#16805e]">
                                   ≈ {moneda(calculo.precioPorPieza ?? 0)} / pieza
@@ -689,7 +770,7 @@ function TablaComparacion({
                 <p className="text-lg font-extrabold">Total</p>
                 <p className="mt-1 text-xs font-medium text-white/60">Solo se comparan cestas completas</p>
               </th>
-              {totales.map((total) => {
+              {totalesVisibles.map((total) => {
                 const ganadora = total.completa && total.total === totalMasBarato;
                 return (
                   <td key={total.supermercado} className={`px-4 py-5 text-center ${ganadora ? "bg-[#176b50]" : ""}`}>
@@ -700,6 +781,11 @@ function TablaComparacion({
                           {total.estimado ? "≈ " : ""}
                           {moneda(total.total)}
                         </p>
+                        {total.comparable && (
+                          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-white/65">
+                            Cantidades comparables
+                          </p>
+                        )}
                         {!total.completa && <p className="mt-1 text-xs font-semibold text-[#f4c95d]">{total.encontrados} de {articulos.length} productos</p>}
                       </>
                     ) : (
