@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "supermercado.eroski.es",
+        pathname: "/imagesMarket/**",
+      },
+      {
+        protocol: "https",
         hostname: "cdn-bm.aktiosdigitalservices.com",
         pathname: "/**",
       },

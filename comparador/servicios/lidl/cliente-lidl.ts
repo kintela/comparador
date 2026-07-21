@@ -15,6 +15,22 @@ const RESULTADOS_POR_PAGINA = 48;
 const MAX_PAGINAS_POR_BUSQUEDA = 1;
 const CATEGORIAS_ESTRICTAS: Record<string, string[]> = {
   aceite: ["aceites y grasas"],
+  detergente: ["detergentes y cuidado de la ropa"],
+};
+const PALABRAS_ALTERNATIVAS: Record<string, string[]> = {
+  detergente: [
+    "detergente",
+    "oxy",
+    "lavado",
+    "lavadora",
+    "ropa",
+    "quitamanchas",
+    "blanqueador",
+    "suavizante",
+    "capsula",
+    "gel",
+    "polvo",
+  ],
 };
 
 function normalizar(texto: string) {
@@ -50,14 +66,24 @@ function productoRelevante(producto: ProductoApiLidl, consulta: string) {
   )
     .split(" ")
     .map(raizPalabra);
-  if (!palabras.every((palabra) => tokens.includes(palabra))) return false;
+  const coincideNombre = palabras.every((palabra) => tokens.includes(palabra));
 
   const categorias = CATEGORIAS_ESTRICTAS[consultaNormalizada];
-  return (
-    !categorias ||
-    categorias.some((categoria) =>
-      normalizar(producto.keyfacts?.wonCategoryPrimary ?? "").includes(categoria),
-    )
+  if (!categorias) return coincideNombre;
+
+  const coincideCategoria = categorias.some((categoria) =>
+    normalizar(producto.keyfacts?.wonCategoryPrimary ?? "").includes(categoria),
+  );
+  if (!coincideCategoria) return false;
+  if (coincideNombre) return true;
+
+  const textoProducto = normalizar(
+    [producto.title, producto.keyfacts?.title, producto.keyfacts?.fullTitle]
+      .filter(Boolean)
+      .join(" "),
+  );
+  return (PALABRAS_ALTERNATIVAS[consultaNormalizada] ?? []).some((palabra) =>
+    textoProducto.split(" ").map(raizPalabra).includes(raizPalabra(palabra)),
   );
 }
 

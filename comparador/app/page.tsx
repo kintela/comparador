@@ -13,9 +13,15 @@ export default function Home() {
             </span>
             <span className="text-xl font-bold tracking-tight">Comparador</span>
           </Link>
-          <span className="hidden text-sm font-medium text-[#60766e] sm:block">
-            Precios claros para comprar mejor
-          </span>
+          <nav className="flex items-center gap-2" aria-label="Navegación principal">
+            <Link
+              href="/lista-compra"
+              className="rounded-xl border border-[#176b50]/20 bg-white px-4 py-2 text-sm font-bold text-[#176b50] transition hover:border-[#176b50]/40 hover:bg-[#e7f5ee]"
+            >
+              <span className="sm:hidden">Mi lista</span>
+              <span className="hidden sm:inline">Lista de la compra</span>
+            </Link>
+          </nav>
         </div>
       </header>
 

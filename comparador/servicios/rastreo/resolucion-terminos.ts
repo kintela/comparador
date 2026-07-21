@@ -1,5 +1,6 @@
 import "server-only";
 
+import { obtenerVariantesSemanticas } from "@/servicios/busqueda/variantes-semanticas";
 import { normalizarTerminoRastreo } from "@/servicios/rastreo/terminos";
 import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
@@ -7,6 +8,21 @@ type TerminoConocido = {
   termino: string;
   termino_normalizado: string;
 };
+
+function crearVariantesFlexion(termino: string): string[] {
+  const palabras = termino.trim().split(/\s+/);
+  const ultima = palabras.at(-1);
+  if (!ultima) return [];
+
+  const variantes: string[] = [];
+  if (ultima.length > 4 && ultima.endsWith("es")) {
+    variantes.push([...palabras.slice(0, -1), ultima.slice(0, -2)].join(" "));
+  }
+  if (ultima.length > 3 && ultima.endsWith("s")) {
+    variantes.push([...palabras.slice(0, -1), ultima.slice(0, -1)].join(" "));
+  }
+  return variantes;
+}
 
 export type ResolucionTermino = {
   termino: string;
@@ -48,7 +64,16 @@ function crearResolucion(
     normalizado,
     corregido: normalizado !== normalizadoOriginal,
     variantesBusqueda: [
-      ...new Set([termino, normalizado, original.trim()].filter(Boolean)),
+      ...new Set(
+        [
+          termino,
+          normalizado,
+          original.trim(),
+          ...crearVariantesFlexion(termino),
+          ...crearVariantesFlexion(normalizado),
+          ...obtenerVariantesSemanticas(normalizado),
+        ].filter(Boolean),
+      ),
     ],
   };
 }

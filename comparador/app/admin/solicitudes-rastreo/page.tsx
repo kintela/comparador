@@ -17,9 +17,9 @@ export default function PaginaSolicitudesRastreo() {
             Solicitudes de productos
           </h1>
           <p className="mt-3 max-w-3xl text-slate-400">
-            Prioriza los productos que los usuarios buscaron y todavía no estaban
-            en el catálogo. El rastreo se ejecuta en las cadenas solicitadas y
-            guarda automáticamente los resultados.
+            Prioriza los productos que no tienen precio en alguna de las cadenas
+            consultadas. Cada tarjeta muestra únicamente los supermercados cuya
+            cobertura sigue pendiente.
           </p>
         </div>
         <PanelSolicitudesRastreo />

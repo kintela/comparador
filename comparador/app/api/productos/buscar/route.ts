@@ -1,5 +1,9 @@
 import { registrarSolicitudRastreo } from "@/servicios/solicitudes-rastreo/servidor";
-import { obtenerCadenasComprobadasRecientemente } from "@/servicios/solicitudes-rastreo/cobertura";
+import {
+  obtenerCadenasComprobadasRecientemente,
+  reconciliarSolicitudConCatalogo,
+} from "@/servicios/solicitudes-rastreo/cobertura";
+import { puntuacionRelevanciaProducto } from "@/servicios/busqueda/relevancia-producto";
 import { resolverTerminoRastreo } from "@/servicios/rastreo/resolucion-terminos";
 import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
@@ -10,6 +14,7 @@ type ProductoSupermercadoDb = {
   id: string;
   producto_id: string | null;
   nombre_original: string;
+  categoria_original: string | null;
   codigo_ean: string | null;
   url_imagen: string | null;
   url_producto: string | null;
@@ -25,6 +30,8 @@ type PrecioDb = {
   producto_supermercado_id: string;
   precio: number;
   precio_promocional: number | null;
+  precio_referencia: number | null;
+  unidad_referencia: string | null;
   texto_promocion: string | null;
   fecha_inicio_promocion: string | null;
   fecha_fin_promocion: string | null;
@@ -45,6 +52,11 @@ type CoberturaBusqueda = {
 
 type IdProductoSupermercadoRpc = {
   producto_supermercado_id: string;
+};
+
+type CadenaSeleccionada = {
+  id: string;
+  nombre: string;
 };
 
 async function respuestaSinProductos({
@@ -104,6 +116,13 @@ export async function GET(request: Request) {
   const parametros = new URL(request.url).searchParams;
   const consultaOriginal = parametros.get("q")?.trim() ?? "";
   const soloOfertas = ["1", "true"].includes(parametros.get("ofertas")?.toLowerCase() ?? "");
+  const asegurarCobertura = ["1", "true"].includes(
+    parametros.get("cobertura")?.toLowerCase() ?? "",
+  );
+  const limiteSolicitado = Number(parametros.get("limite") ?? 20);
+  const limite = Number.isInteger(limiteSolicitado)
+    ? Math.min(Math.max(limiteSolicitado, 1), 100)
+    : 20;
   const supermercados = [
     ...new Set(
       parametros
@@ -135,7 +154,7 @@ export async function GET(request: Request) {
       ? await resolverTerminoRastreo(consulta)
       : null;
     const seleccionProductos =
-      "id, producto_id, nombre_original, codigo_ean, url_imagen, url_producto, productos(nombre, marcas(nombre), categorias(nombre)), cadenas_supermercados(nombre)";
+      "id, producto_id, nombre_original, categoria_original, codigo_ean, url_imagen, url_producto, productos(nombre, marcas(nombre), categorias(nombre)), cadenas_supermercados(nombre)";
 
     let idsConPromocion: string[] | null = null;
     if (soloOfertas && !consulta) {
@@ -165,15 +184,17 @@ export async function GET(request: Request) {
     }
 
     let idsCadenas: string[] | null = null;
+    let cadenasSeleccionadas: CadenaSeleccionada[] = [];
     if (supermercados.length > 0) {
       const { data: cadenas, error: errorCadenas } = await supabase
         .from("cadenas_supermercados")
-        .select("id")
+        .select("id, nombre")
         .in("nombre", supermercados)
         .eq("activa", true);
       if (errorCadenas) throw errorCadenas;
 
-      idsCadenas = (cadenas ?? []).map((cadena) => cadena.id);
+      cadenasSeleccionadas = (cadenas ?? []) as CadenaSeleccionada[];
+      idsCadenas = cadenasSeleccionadas.map((cadena) => cadena.id);
       if (idsCadenas.length === 0) {
         return respuestaSinProductos({
           request,
@@ -185,15 +206,15 @@ export async function GET(request: Request) {
       }
     }
 
-    function crearConsultaProductos() {
+    function crearConsultaProductos(idsFiltro = idsCadenas) {
       let consultaProductos = supabase
         .from("productos_supermercado")
         .select(seleccionProductos)
         .eq("activo", true);
-      if (idsCadenas) {
+      if (idsFiltro) {
         consultaProductos = consultaProductos.in(
           "cadena_supermercado_id",
-          idsCadenas,
+          idsFiltro,
         );
       }
       return consultaProductos;
@@ -206,7 +227,10 @@ export async function GET(request: Request) {
           await supabase.rpc("buscar_ids_productos_supermercado", {
             p_consulta: variante,
             p_cadenas: idsCadenas,
-            p_limite: 120,
+            p_limite: Math.min(
+              500,
+              Math.max(120, limite * Math.max(idsCadenas?.length ?? 1, 1)),
+            ),
           });
         if (errorCoincidencias) throw errorCoincidencias;
         const idsCoincidentes = (
@@ -220,6 +244,57 @@ export async function GET(request: Request) {
         if (resultado.error) throw resultado.error;
         data = resultado.data ?? [];
         if (data.length > 0) break;
+      }
+
+      if (
+        asegurarCobertura &&
+        cadenasSeleccionadas.length > 1 &&
+        data.length > 0
+      ) {
+        const cadenasConCoincidencias = new Set(
+          (data as unknown as ProductoSupermercadoDb[])
+            .map((producto) => producto.cadenas_supermercados?.nombre)
+            .filter((nombre): nombre is string => Boolean(nombre)),
+        );
+        const cadenasFaltantes = cadenasSeleccionadas.filter(
+          (cadena) => !cadenasConCoincidencias.has(cadena.nombre),
+        );
+        const variantes = terminoResuelto?.variantesBusqueda ?? [consulta];
+        const resultadosAdicionales = await Promise.all(
+          cadenasFaltantes.map(async (cadena) => {
+            for (const variante of variantes) {
+              const { data: coincidencias, error: errorCoincidencias } =
+                await supabase.rpc("buscar_ids_productos_supermercado", {
+                  p_consulta: variante,
+                  p_cadenas: [cadena.id],
+                  p_limite: Math.min(100, Math.max(limite, 20)),
+                });
+              if (errorCoincidencias) throw errorCoincidencias;
+              const idsCoincidentes = (
+                (coincidencias ?? []) as IdProductoSupermercadoRpc[]
+              ).map((item) => item.producto_supermercado_id);
+              if (idsCoincidentes.length === 0) continue;
+
+              const resultado = await crearConsultaProductos([cadena.id]).in(
+                "id",
+                idsCoincidentes,
+              );
+              if (resultado.error) throw resultado.error;
+              if ((resultado.data?.length ?? 0) > 0) {
+                return resultado.data ?? [];
+              }
+            }
+            return [];
+          }),
+        );
+        const productosUnicos = new Map<string, unknown>();
+        for (const producto of [
+          ...data,
+          ...resultadosAdicionales.flat(),
+        ] as Array<{ id: string }>) {
+          productosUnicos.set(producto.id, producto);
+        }
+        data = [...productosUnicos.values()];
       }
     } else {
       const resultado = await crearConsultaProductos()
@@ -245,7 +320,7 @@ export async function GET(request: Request) {
     const { data: datosPrecios, error: errorPrecios } = await supabase
       .from("precios")
       .select(
-        "producto_supermercado_id, precio, precio_promocional, texto_promocion, fecha_inicio_promocion, fecha_fin_promocion, disponible, fecha_obtencion, tiendas(id, nombre, municipio)",
+        "producto_supermercado_id, precio, precio_promocional, precio_referencia, unidad_referencia, texto_promocion, fecha_inicio_promocion, fecha_fin_promocion, disponible, fecha_obtencion, tiendas(id, nombre, municipio)",
       )
       .in("producto_supermercado_id", ids)
       .order("fecha_obtencion", { ascending: false });
@@ -272,6 +347,8 @@ export async function GET(request: Request) {
           municipio: string | null;
           precio: number;
           precioOriginal: number | null;
+          precioReferencia: number | null;
+          unidadReferencia: string | null;
           textoPromocion: string | null;
           enOferta: boolean;
           disponible: boolean;
@@ -292,7 +369,10 @@ export async function GET(request: Request) {
             ? `/api/imagenes/carrefour?ean=${encodeURIComponent(producto.codigo_ean)}`
             : producto.url_imagen,
         marca: producto.productos?.marcas?.nombre ?? null,
-        categoria: producto.productos?.categorias?.nombre ?? null,
+        categoria:
+          producto.productos?.categorias?.nombre ??
+          producto.categoria_original ??
+          null,
         ofertas: [],
       };
 
@@ -319,6 +399,11 @@ export async function GET(request: Request) {
             promocionVigente && precio.precio_promocional !== null
               ? Number(precio.precio)
               : null,
+          precioReferencia:
+            precio.precio_referencia === null
+              ? null
+              : Number(precio.precio_referencia),
+          unidadReferencia: precio.unidad_referencia,
           textoPromocion: promocionVigente ? precio.texto_promocion : null,
           enOferta: promocionVigente,
           disponible: precio.disponible,
@@ -336,8 +421,61 @@ export async function GET(request: Request) {
       .filter(
         (producto) => !soloOfertas || producto.ofertas.some((oferta) => oferta.enOferta),
       )
+      .filter(
+        (producto) =>
+          !consulta ||
+          puntuacionRelevanciaProducto(
+            producto.nombre,
+            terminoResuelto?.termino ?? consulta,
+          ) > 0,
+      )
       .sort((a, b) => (a.ofertas[0]?.precio ?? Infinity) - (b.ofertas[0]?.precio ?? Infinity));
-    const productos = productosCoincidentes.slice(0, 20);
+    const productos = productosCoincidentes.slice(0, limite);
+    if (asegurarCobertura && supermercados.length > 0) {
+      const idsIncluidos = new Set(productos.map((producto) => producto.id));
+
+      for (const supermercado of supermercados) {
+        const candidatosSupermercado = productosCoincidentes.filter(
+          (producto) =>
+            producto.ofertas.some(
+              (oferta) =>
+                oferta.supermercado === supermercado && oferta.disponible,
+            ),
+        );
+        const candidatosCobertura = candidatosSupermercado;
+        let mejorProducto: (typeof productosCoincidentes)[number] | null = null;
+        let mejorPrecio = Infinity;
+        let mejorRelevancia = -1;
+
+        for (const producto of candidatosCobertura) {
+          const precioSupermercado = Math.min(
+            ...producto.ofertas
+              .filter(
+                (oferta) =>
+                  oferta.supermercado === supermercado && oferta.disponible,
+              )
+              .map((oferta) => oferta.precio),
+          );
+          const relevancia = puntuacionRelevanciaProducto(
+            producto.nombre,
+            terminoResuelto?.termino ?? consulta,
+          );
+          if (
+            relevancia > mejorRelevancia ||
+            (relevancia === mejorRelevancia && precioSupermercado < mejorPrecio)
+          ) {
+            mejorRelevancia = relevancia;
+            mejorPrecio = precioSupermercado;
+            mejorProducto = producto;
+          }
+        }
+
+        if (mejorProducto && !idsIncluidos.has(mejorProducto.id)) {
+          productos.push(mejorProducto);
+          idsIncluidos.add(mejorProducto.id);
+        }
+      }
+    }
 
     if (productos.length === 0) {
       return respuestaSinProductos({
@@ -356,6 +494,12 @@ export async function GET(request: Request) {
         ),
       ),
     ];
+    if (consulta && terminoResuelto) {
+      await reconciliarSolicitudConCatalogo({
+        terminoNormalizado: terminoResuelto.normalizado,
+        supermercadosEncontrados,
+      });
+    }
     const cadenasComprobadas =
       consulta && !soloOfertas && terminoResuelto
         ? await obtenerCadenasComprobadasRecientemente({

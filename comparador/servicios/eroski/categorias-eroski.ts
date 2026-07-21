@@ -17,6 +17,16 @@ const CATEGORIAS_POR_BUSQUEDA: Record<string, string> = {
   pescado: "Pescado y marisco",
   verduras: "Verduras y hortalizas",
   fruta: "Frutas",
+  mandarina: "Frutas",
+  naranja: "Frutas",
+  manzana: "Frutas",
+  pera: "Frutas",
+  platano: "Frutas",
+  melon: "Frutas",
+  sandia: "Frutas",
+  kiwi: "Frutas",
+  limon: "Frutas",
+  fresa: "Frutas",
   legumbres: "Legumbres",
   conservas: "Conservas",
   cereales: "Cereales",
@@ -36,5 +46,23 @@ export function crearSlug(valor: string): string {
 }
 
 export function obtenerCategoriaSugerida(consulta: string): string | null {
-  return CATEGORIAS_POR_BUSQUEDA[crearSlug(consulta).replaceAll("-", " ")] ?? null;
+  const termino = crearSlug(consulta).replaceAll("-", " ");
+  const directa = CATEGORIAS_POR_BUSQUEDA[termino];
+  if (directa) return directa;
+
+  const palabras = termino.split(" ");
+  const ultima = palabras.at(-1);
+  if (!ultima) return null;
+  const candidatas = [
+    ultima.length > 4 && ultima.endsWith("es") ? ultima.slice(0, -2) : "",
+    ultima.length > 3 && ultima.endsWith("s") ? ultima.slice(0, -1) : "",
+  ];
+  for (const candidata of candidatas) {
+    if (!candidata) continue;
+    const singular = [...palabras.slice(0, -1), candidata].join(" ");
+    if (CATEGORIAS_POR_BUSQUEDA[singular]) {
+      return CATEGORIAS_POR_BUSQUEDA[singular];
+    }
+  }
+  return null;
 }

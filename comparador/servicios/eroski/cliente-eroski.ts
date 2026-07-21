@@ -6,12 +6,18 @@ import type { ResultadoRastreoEroski } from "./tipos-eroski";
 const ORIGEN_EROSKI = "https://supermercado.eroski.es";
 const TAMANO_MAXIMO_HTML = 5_000_000;
 
+function normalizarConsultaEroski(consulta: string) {
+  return consulta
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 export function construirUrlBusquedaEroski(
   consulta: string,
   pagina = 0,
 ): string {
   const url = new URL("/es/search/results/", ORIGEN_EROSKI);
-  url.searchParams.set("q", consulta);
+  url.searchParams.set("q", normalizarConsultaEroski(consulta));
   if (pagina > 0) url.searchParams.set("pageNumber", pagina.toString());
   return url.toString();
 }

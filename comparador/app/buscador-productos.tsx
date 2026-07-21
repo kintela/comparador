@@ -129,6 +129,7 @@ export function BuscadorProductos() {
     try {
       const parametros = new URLSearchParams();
       if (consultaLimpia) parametros.set("q", consultaLimpia);
+      if (consultaLimpia) parametros.set("cobertura", "1");
       if (filtrarOfertas) parametros.set("ofertas", "1");
       for (const supermercado of supermercados) {
         parametros.append("supermercado", supermercado);

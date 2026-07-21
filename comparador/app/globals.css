@@ -17,3 +17,28 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+.scrollbar-tabla {
+  scrollbar-color: #176b50 #e5e9e6;
+  scrollbar-width: auto;
+  scrollbar-gutter: stable;
+}
+
+.scrollbar-tabla::-webkit-scrollbar {
+  height: 14px;
+}
+
+.scrollbar-tabla::-webkit-scrollbar-track {
+  background: #e5e9e6;
+  border-radius: 999px;
+}
+
+.scrollbar-tabla::-webkit-scrollbar-thumb {
+  background: #176b50;
+  border: 3px solid #e5e9e6;
+  border-radius: 999px;
+}
+
+.scrollbar-tabla::-webkit-scrollbar-thumb:hover {
+  background: #125740;
+}
