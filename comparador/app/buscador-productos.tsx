@@ -36,6 +36,11 @@ type RespuestaBusqueda = {
     totalSolicitudes?: number;
     contabilizada?: boolean;
   } | null;
+  cobertura?: {
+    encontrados: string[];
+    pendientes: string[];
+    sinResultadosRecientes: string[];
+  };
   total?: number;
   productos?: Producto[];
   error?: string;
@@ -280,9 +285,11 @@ export function BuscadorProductos() {
               {supermercadosSeleccionados.length === 0
                 ? "Selecciona al menos un supermercado."
                 : resultado.solicitudRastreo?.registrada
-                  ? resultado.solicitudRastreo.contabilizada
+                ? resultado.solicitudRastreo.contabilizada
                     ? "Hemos añadido este producto a la cola de rastreo."
                     : "Este producto ya estaba solicitado y continúa en la cola de rastreo."
+                : (resultado.cobertura?.sinResultadosRecientes.length ?? 0) > 0
+                  ? "Lo hemos rastreado recientemente en los supermercados seleccionados, pero no publicaban resultados. Volveremos a comprobarlo más adelante."
                 : resultado.soloOfertas
                 ? "Prueba con otro producto o consulta todas las ofertas."
                 : "Prueba con un término más general."}
@@ -300,6 +307,39 @@ export function BuscadorProductos() {
 
         {resultado?.ok && productosOrdenados.length > 0 && (
           <div>
+            {((resultado.cobertura?.pendientes.length ?? 0) > 0 ||
+              (resultado.cobertura?.sinResultadosRecientes.length ?? 0) > 0) && (
+              <div className="mb-6 rounded-2xl border border-[#d89a22]/30 bg-[#fff8e8] px-5 py-4 text-sm text-[#7a530c]">
+                <p className="font-bold">
+                  Estado de cobertura de esta búsqueda
+                </p>
+                <p className="mt-1 leading-6">
+                  Ya hay precios en{" "}
+                  {resultado.cobertura?.encontrados.join(", ") ||
+                    "el catálogo actual"}
+                  .
+                </p>
+                {(resultado.cobertura?.sinResultadosRecientes.length ?? 0) >
+                  0 && (
+                  <p className="mt-1 leading-6">
+                    Rastreados recientemente sin resultados:{" "}
+                    <span className="font-semibold">
+                      {resultado.cobertura?.sinResultadosRecientes.join(", ")}
+                    </span>
+                    .
+                  </p>
+                )}
+                {(resultado.cobertura?.pendientes.length ?? 0) > 0 && (
+                  <p className="mt-1 leading-6">
+                    Hemos añadido a la cola:{" "}
+                    <span className="font-semibold">
+                      {resultado.cobertura?.pendientes.join(", ")}
+                    </span>
+                    .
+                  </p>
+                )}
+              </div>
+            )}
             <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-[#16805e]">Resultados</p>

@@ -1,4 +1,5 @@
 import { registrarSolicitudRastreo } from "@/servicios/solicitudes-rastreo/servidor";
+import { obtenerCadenasComprobadasRecientemente } from "@/servicios/solicitudes-rastreo/cobertura";
 import { resolverTerminoRastreo } from "@/servicios/rastreo/resolucion-terminos";
 import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
@@ -36,23 +37,48 @@ type PrecioDb = {
   } | null;
 };
 
+type CoberturaBusqueda = {
+  encontrados: string[];
+  pendientes: string[];
+  sinResultadosRecientes: string[];
+};
+
+type IdProductoSupermercadoRpc = {
+  producto_supermercado_id: string;
+};
+
 async function respuestaSinProductos({
   request,
   consulta,
   soloOfertas,
   supermercados,
+  terminoNormalizado,
 }: {
   request: Request;
   consulta: string;
   soloOfertas: boolean;
   supermercados: string[];
+  terminoNormalizado?: string;
 }) {
+  const cadenasComprobadas =
+    consulta && !soloOfertas && terminoNormalizado
+      ? await obtenerCadenasComprobadasRecientemente({ terminoNormalizado })
+      : { conResultados: [], sinResultados: [] };
+  const comprobadas = [
+    ...cadenasComprobadas.conResultados,
+    ...cadenasComprobadas.sinResultados,
+  ];
+  const pendientes = soloOfertas
+    ? []
+    : supermercados.filter(
+        (supermercado) => !comprobadas.includes(supermercado),
+      );
   const solicitudRastreo =
-    consulta && !soloOfertas
+    consulta && !soloOfertas && pendientes.length > 0
       ? await registrarSolicitudRastreo({
           request,
           termino: consulta,
-          supermercados,
+          supermercados: pendientes,
         })
       : null;
 
@@ -64,6 +90,13 @@ async function respuestaSinProductos({
     total: 0,
     productos: [],
     solicitudRastreo,
+    cobertura: {
+      encontrados: [],
+      pendientes,
+      sinResultadosRecientes: supermercados.filter((supermercado) =>
+        cadenasComprobadas.sinResultados.includes(supermercado),
+      ),
+    } satisfies CoberturaBusqueda,
   });
 }
 
@@ -126,6 +159,7 @@ export async function GET(request: Request) {
           consulta,
           soloOfertas,
           supermercados,
+          terminoNormalizado: terminoResuelto?.normalizado,
         });
       }
     }
@@ -146,6 +180,7 @@ export async function GET(request: Request) {
           consulta,
           soloOfertas,
           supermercados,
+          terminoNormalizado: terminoResuelto?.normalizado,
         });
       }
     }
@@ -167,9 +202,21 @@ export async function GET(request: Request) {
     let data: unknown[] = [];
     if (consulta) {
       for (const variante of terminoResuelto?.variantesBusqueda ?? [consulta]) {
-        const resultado = await crearConsultaProductos()
-          .ilike("nombre_original", `%${variante}%`)
-          .limit(120);
+        const { data: coincidencias, error: errorCoincidencias } =
+          await supabase.rpc("buscar_ids_productos_supermercado", {
+            p_consulta: variante,
+            p_cadenas: idsCadenas,
+            p_limite: 120,
+          });
+        if (errorCoincidencias) throw errorCoincidencias;
+        const idsCoincidentes = (
+          (coincidencias ?? []) as IdProductoSupermercadoRpc[]
+        ).map((item) => item.producto_supermercado_id);
+        if (idsCoincidentes.length === 0) continue;
+        const resultado = await crearConsultaProductos().in(
+          "id",
+          idsCoincidentes,
+        );
         if (resultado.error) throw resultado.error;
         data = resultado.data ?? [];
         if (data.length > 0) break;
@@ -190,6 +237,7 @@ export async function GET(request: Request) {
         consulta,
         soloOfertas,
         supermercados,
+        terminoNormalizado: terminoResuelto?.normalizado,
       });
     }
 
@@ -283,13 +331,13 @@ export async function GET(request: Request) {
       agrupados.set(claveProducto, agrupado);
     }
 
-    const productos = [...agrupados.values()]
+    const productosCoincidentes = [...agrupados.values()]
       .filter((producto) => producto.ofertas.length > 0)
       .filter(
         (producto) => !soloOfertas || producto.ofertas.some((oferta) => oferta.enOferta),
       )
-      .sort((a, b) => (a.ofertas[0]?.precio ?? Infinity) - (b.ofertas[0]?.precio ?? Infinity))
-      .slice(0, 20);
+      .sort((a, b) => (a.ofertas[0]?.precio ?? Infinity) - (b.ofertas[0]?.precio ?? Infinity));
+    const productos = productosCoincidentes.slice(0, 20);
 
     if (productos.length === 0) {
       return respuestaSinProductos({
@@ -297,8 +345,48 @@ export async function GET(request: Request) {
         consulta,
         soloOfertas,
         supermercados,
+        terminoNormalizado: terminoResuelto?.normalizado,
       });
     }
+
+    const supermercadosEncontrados = [
+      ...new Set(
+        productosCoincidentes.flatMap((producto) =>
+          producto.ofertas.map((oferta) => oferta.supermercado),
+        ),
+      ),
+    ];
+    const cadenasComprobadas =
+      consulta && !soloOfertas && terminoResuelto
+        ? await obtenerCadenasComprobadasRecientemente({
+            terminoNormalizado: terminoResuelto.normalizado,
+          })
+        : { conResultados: [], sinResultados: [] };
+    const cadenasComprobadasRecientemente = [
+      ...cadenasComprobadas.conResultados,
+      ...cadenasComprobadas.sinResultados,
+    ];
+    const sinResultadosRecientes = supermercados.filter(
+      (supermercado) =>
+        !supermercadosEncontrados.includes(supermercado) &&
+        cadenasComprobadas.sinResultados.includes(supermercado),
+    );
+    const supermercadosPendientes =
+      consulta && !soloOfertas
+        ? supermercados.filter(
+            (supermercado) =>
+              !supermercadosEncontrados.includes(supermercado) &&
+              !cadenasComprobadasRecientemente.includes(supermercado),
+          )
+        : [];
+    const solicitudRastreo =
+      supermercadosPendientes.length > 0
+        ? await registrarSolicitudRastreo({
+            request,
+            termino: consulta,
+            supermercados: supermercadosPendientes,
+          })
+        : null;
 
     return Response.json({
       ok: true,
@@ -307,6 +395,12 @@ export async function GET(request: Request) {
       supermercados,
       total: productos.length,
       productos,
+      solicitudRastreo,
+      cobertura: {
+        encontrados: supermercadosEncontrados,
+        pendientes: supermercadosPendientes,
+        sinResultadosRecientes,
+      } satisfies CoberturaBusqueda,
     });
   } catch (error) {
     console.error(

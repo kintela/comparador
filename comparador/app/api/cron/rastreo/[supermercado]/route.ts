@@ -28,6 +28,7 @@ import {
   liberarBloqueoRastreo,
 } from "@/servicios/rastreo/bloqueo";
 import { CONFIGURACION_RASTREO_AUTOMATICO } from "@/servicios/rastreo/configuracion";
+import { esRespuestaSinResultados } from "@/servicios/rastreo/errores";
 import {
   desactivarReferenciasNoEncontradas,
   obtenerReferenciasNoActualizadas,
@@ -232,15 +233,6 @@ function combinarConsultas(
     }
   }
   return [...consultas.values()];
-}
-
-function esRespuestaSinResultados(mensaje: string): boolean {
-  return (
-    /no se pudieron identificar productos/i.test(mensaje) ||
-    /no se encontr[oó] una categor[ií]a adecuada/i.test(mensaje) ||
-    /no devolvi[oó] ning[uú]n producto/i.test(mensaje) ||
-    /respondi[oó] con estado 404/i.test(mensaje)
-  );
 }
 
 async function guardarResultadosSolicitudes(

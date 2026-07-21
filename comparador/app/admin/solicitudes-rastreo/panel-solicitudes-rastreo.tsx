@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 
+import { esRespuestaSinResultados } from "@/servicios/rastreo/errores";
+
 type EstadoSolicitud =
   | "pendiente"
   | "procesando"
@@ -21,6 +23,13 @@ type Solicitud = {
   fecha_primera_solicitud: string;
   fecha_ultima_solicitud: string;
   fecha_procesado: string | null;
+  solicitudes_rastreo_progreso: Array<{
+    supermercado: string;
+    estado: "completado" | "error";
+    productos_encontrados: number;
+    mensaje_error: string | null;
+    fecha_procesado: string;
+  }>;
 };
 
 type RespuestaCola = {
@@ -114,10 +123,20 @@ export function PanelSolicitudesRastreo() {
     try {
       await actualizar(solicitud.id, "procesando");
       const cadenasSolicitadas = solicitud.supermercados_solicitados ?? [];
+      const cadenasCompletadas = new Set(
+        (["completada", "sin_resultados", "descartada"].includes(
+          solicitud.estado,
+        )
+          ? []
+          : solicitud.solicitudes_rastreo_progreso ?? [])
+          .filter((item) => item.estado === "completado")
+          .map((item) => item.supermercado),
+      );
       const rastreadores =
         cadenasSolicitadas.length > 0
           ? RASTREADORES.filter((rastreador) =>
-              cadenasSolicitadas.includes(rastreador.cadena),
+              cadenasSolicitadas.includes(rastreador.cadena) &&
+              !cadenasCompletadas.has(rastreador.ruta),
             )
           : [...RASTREADORES];
 
@@ -170,9 +189,18 @@ export function PanelSolicitudesRastreo() {
         (suma, resultado) => suma + resultado.productos,
         0,
       );
+      const hayErroresReales = resultados.some(
+        (resultado) =>
+          !resultado.ok &&
+          !esRespuestaSinResultados(resultado.error ?? ""),
+      );
       await actualizar(
         solicitud.id,
-        total > 0 ? "completada" : "sin_resultados",
+        hayErroresReales
+          ? "pendiente"
+          : total > 0
+            ? "completada"
+            : "sin_resultados",
         total,
         { cadenas: resultados },
       );
