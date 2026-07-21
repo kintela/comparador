@@ -1,28 +1,4 @@
-import { guardarRastreoAlcampo } from "@/servicios/alcampo/persistencia-alcampo";
-import { rastrearLoteAlcampo } from "@/servicios/alcampo/rastreo-lote";
-import { guardarRastreoAldi } from "@/servicios/aldi/persistencia-aldi";
-import { rastrearLoteAldi } from "@/servicios/aldi/rastreo-lote";
-import { guardarRastreoBm } from "@/servicios/bm/persistencia-bm";
-import { rastrearLoteBm } from "@/servicios/bm/rastreo-lote";
-import { guardarRastreoCarrefour } from "@/servicios/carrefour/persistencia-carrefour";
-import { rastrearLoteCarrefour } from "@/servicios/carrefour/rastreo-lote";
-import { guardarRastreoCoviran } from "@/servicios/coviran/persistencia-coviran";
-import { rastrearLoteCoviran } from "@/servicios/coviran/rastreo-lote";
-import { guardarRastreoCostco } from "@/servicios/costco/persistencia-costco";
-import { rastrearLoteCostco } from "@/servicios/costco/rastreo-lote";
 import { autorizarCron } from "@/servicios/cron/autorizacion";
-import { guardarRastreoDia } from "@/servicios/dia/persistencia-dia";
-import { rastrearLoteDia } from "@/servicios/dia/rastreo-lote";
-import { guardarRastreoEroski } from "@/servicios/eroski/persistencia-eroski";
-import { rastrearLoteEroski } from "@/servicios/eroski/rastreo-lote";
-import { guardarRastreoLidl } from "@/servicios/lidl/persistencia-lidl";
-import { rastrearLoteLidl } from "@/servicios/lidl/rastreo-lote";
-import { guardarRastreoLupa } from "@/servicios/lupa/persistencia-lupa";
-import { rastrearLoteLupa } from "@/servicios/lupa/rastreo-lote";
-import { guardarRastreoMercadona } from "@/servicios/mercadona/persistencia-mercadona";
-import { rastrearLoteMercadona } from "@/servicios/mercadona/rastreo-lote";
-import { guardarRastreoPrimaprix } from "@/servicios/primaprix/persistencia-primaprix";
-import { rastrearLotePrimaprix } from "@/servicios/primaprix/rastreo-lote";
 import {
   adquirirBloqueoRastreo,
   liberarBloqueoRastreo,
@@ -309,6 +285,11 @@ async function ejecutarRastreo(
 
   switch (supermercado) {
     case "eroski": {
+      const [{ rastrearLoteEroski }, { guardarRastreoEroski }] =
+        await Promise.all([
+          import("@/servicios/eroski/rastreo-lote"),
+          import("@/servicios/eroski/persistencia-eroski"),
+        ]);
       const resultado = await rastrearLoteEroski({
         consultas,
         paginasPorConsulta: paginasEroskiPorConsulta,
@@ -347,6 +328,10 @@ async function ejecutarRastreo(
       return sumarReferencias(resumen, extra);
     }
     case "bm": {
+      const [{ rastrearLoteBm }, { guardarRastreoBm }] = await Promise.all([
+        import("@/servicios/bm/rastreo-lote"),
+        import("@/servicios/bm/persistencia-bm"),
+      ]);
       const resultado = await rastrearLoteBm(parametros);
       const persistencia = await guardarRastreoBm({
         productos: resultado.productos,
@@ -381,6 +366,11 @@ async function ejecutarRastreo(
       return sumarReferencias(resumen, extra);
     }
     case "mercadona": {
+      const [{ rastrearLoteMercadona }, { guardarRastreoMercadona }] =
+        await Promise.all([
+          import("@/servicios/mercadona/rastreo-lote"),
+          import("@/servicios/mercadona/persistencia-mercadona"),
+        ]);
       const resultado = await rastrearLoteMercadona({
         ...parametros,
         codigoPostal: codigoPostalMercadona,
@@ -421,6 +411,11 @@ async function ejecutarRastreo(
       return sumarReferencias(resumen, extra);
     }
     case "aldi": {
+      const [{ rastrearLoteAldi }, { guardarRastreoAldi }] =
+        await Promise.all([
+          import("@/servicios/aldi/rastreo-lote"),
+          import("@/servicios/aldi/persistencia-aldi"),
+        ]);
       const resultado = await rastrearLoteAldi(parametros);
       const persistencia = await guardarRastreoAldi({
         productos: resultado.productos,
@@ -455,6 +450,10 @@ async function ejecutarRastreo(
       return sumarReferencias(resumen, extra);
     }
     case "dia": {
+      const [{ rastrearLoteDia }, { guardarRastreoDia }] = await Promise.all([
+        import("@/servicios/dia/rastreo-lote"),
+        import("@/servicios/dia/persistencia-dia"),
+      ]);
       const resultado = await rastrearLoteDia(parametros);
       const persistencia = await guardarRastreoDia({
         productos: resultado.productos,
@@ -491,6 +490,11 @@ async function ejecutarRastreo(
       return sumarReferencias(resumen, extra);
     }
     case "lidl": {
+      const [{ rastrearLoteLidl }, { guardarRastreoLidl }] =
+        await Promise.all([
+          import("@/servicios/lidl/rastreo-lote"),
+          import("@/servicios/lidl/persistencia-lidl"),
+        ]);
       const resultado = await rastrearLoteLidl(parametros);
       const persistencia = await guardarRastreoLidl({
         productos: resultado.productos,
@@ -525,6 +529,11 @@ async function ejecutarRastreo(
       return sumarReferencias(resumen, extra);
     }
     case "alcampo": {
+      const [{ rastrearLoteAlcampo }, { guardarRastreoAlcampo }] =
+        await Promise.all([
+          import("@/servicios/alcampo/rastreo-lote"),
+          import("@/servicios/alcampo/persistencia-alcampo"),
+        ]);
       const resultado = await rastrearLoteAlcampo(parametros);
       const persistencia = await guardarRastreoAlcampo({
         productos: resultado.productos,
@@ -561,6 +570,11 @@ async function ejecutarRastreo(
       return sumarReferencias(resumen, extra);
     }
     case "lupa": {
+      const [{ rastrearLoteLupa }, { guardarRastreoLupa }] =
+        await Promise.all([
+          import("@/servicios/lupa/rastreo-lote"),
+          import("@/servicios/lupa/persistencia-lupa"),
+        ]);
       const resultado = await rastrearLoteLupa(parametros);
       const persistencia = await guardarRastreoLupa({
         productos: resultado.productos,
@@ -595,6 +609,11 @@ async function ejecutarRastreo(
       return sumarReferencias(resumen, extra);
     }
     case "coviran": {
+      const [{ rastrearLoteCoviran }, { guardarRastreoCoviran }] =
+        await Promise.all([
+          import("@/servicios/coviran/rastreo-lote"),
+          import("@/servicios/coviran/persistencia-coviran"),
+        ]);
       const resultado = await rastrearLoteCoviran(parametros);
       const persistencia = await guardarRastreoCoviran({
         productos: resultado.productos,
@@ -629,6 +648,11 @@ async function ejecutarRastreo(
       return sumarReferencias(resumen, extra);
     }
     case "carrefour": {
+      const [{ rastrearLoteCarrefour }, { guardarRastreoCarrefour }] =
+        await Promise.all([
+          import("@/servicios/carrefour/rastreo-lote"),
+          import("@/servicios/carrefour/persistencia-carrefour"),
+        ]);
       const resultado = await rastrearLoteCarrefour(parametros);
       const persistencia = await guardarRastreoCarrefour({
         productos: resultado.productos,
@@ -663,6 +687,11 @@ async function ejecutarRastreo(
       return sumarReferencias(resumen, extra);
     }
     case "costco": {
+      const [{ rastrearLoteCostco }, { guardarRastreoCostco }] =
+        await Promise.all([
+          import("@/servicios/costco/rastreo-lote"),
+          import("@/servicios/costco/persistencia-costco"),
+        ]);
       const resultado = await rastrearLoteCostco(parametros);
       const persistencia = await guardarRastreoCostco({
         productos: resultado.productos,
@@ -697,6 +726,11 @@ async function ejecutarRastreo(
       return sumarReferencias(resumen, extra);
     }
     case "primaprix": {
+      const [{ rastrearLotePrimaprix }, { guardarRastreoPrimaprix }] =
+        await Promise.all([
+          import("@/servicios/primaprix/rastreo-lote"),
+          import("@/servicios/primaprix/persistencia-primaprix"),
+        ]);
       const resultado = await rastrearLotePrimaprix(parametros);
       const persistencia = await guardarRastreoPrimaprix({
         productos: resultado.productos,

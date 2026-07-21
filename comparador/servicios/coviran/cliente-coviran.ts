@@ -2,8 +2,6 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
-import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-
 import { obtenerCategoriaSugerida } from "@/servicios/eroski/categorias-eroski";
 
 import type { CatalogoCoviran, ProductoCoviran } from "./tipos-coviran";
@@ -400,6 +398,7 @@ async function descargarCatalogo(): Promise<CatalogoCoviran> {
     throw new Error(`Covirán respondió con estado ${respuesta.status}`);
   }
 
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const documento = await getDocument({
     data: new Uint8Array(await respuesta.arrayBuffer()),
   }).promise;
