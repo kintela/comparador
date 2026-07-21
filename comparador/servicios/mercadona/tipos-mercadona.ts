@@ -39,11 +39,17 @@ export type ProductoApiMercadona = {
   display_name: string;
   slug?: string | null;
   packaging?: string | null;
+  brand?: string | null;
   published?: boolean;
   status?: string | null;
   share_url?: string;
   thumbnail?: string | null;
-  categories?: Array<{ id: number; name: string; level: number }>;
+  categories?: Array<{
+    id: number;
+    name: string;
+    level: number;
+    categories?: ProductoApiMercadona["categories"];
+  }>;
   price_instructions?: {
     unit_size?: number | null;
     size_format?: string | null;

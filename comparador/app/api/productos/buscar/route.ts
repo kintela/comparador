@@ -226,22 +226,70 @@ export async function GET(request: Request) {
       return consultaProductos;
     }
 
+    async function buscarIdsCoincidentes({
+      variante,
+      cadenas,
+      limiteRpc,
+    }: {
+      variante: string;
+      cadenas: string[] | null;
+      limiteRpc: number;
+    }) {
+      async function consultar(texto: string, limiteConsulta = limiteRpc) {
+        const { data: coincidencias, error: errorCoincidencias } =
+          await supabase.rpc("buscar_ids_productos_supermercado", {
+            p_consulta: texto,
+            p_cadenas: cadenas,
+            p_limite: limiteConsulta,
+          });
+        if (errorCoincidencias) throw errorCoincidencias;
+        return ((coincidencias ?? []) as IdProductoSupermercadoRpc[]).map(
+          (item) => item.producto_supermercado_id,
+        );
+      }
+
+      const idsFrase = await consultar(variante);
+      const palabras = [
+        ...new Set(
+          variante
+            .trim()
+            .split(/\s+/)
+            .filter((palabra) => palabra.length > 1),
+        ),
+      ];
+      // Evita convertir una consulta anormalmente larga en decenas de llamadas
+      // a Supabase desde esta ruta pública.
+      if (palabras.length <= 1 || palabras.length > 8) return idsFrase;
+
+      const resultadosPalabras = await Promise.all(
+        palabras.map((palabra) => consultar(palabra, 500)),
+      );
+      const coincidenciasPorId = new Map<string, number>();
+      for (const idsPalabra of resultadosPalabras) {
+        for (const id of new Set(idsPalabra)) {
+          coincidenciasPorId.set(id, (coincidenciasPorId.get(id) ?? 0) + 1);
+        }
+      }
+      const minimoCoincidencias = Math.min(palabras.length, 2);
+      const idsFlexibles = [...coincidenciasPorId.entries()]
+        .filter(([, coincidencias]) => coincidencias >= minimoCoincidencias)
+        .sort((a, b) => b[1] - a[1])
+        .map(([id]) => id);
+
+      return [...new Set([...idsFrase, ...idsFlexibles])].slice(0, limiteRpc);
+    }
+
     let data: unknown[] = [];
     if (consulta) {
       for (const variante of terminoResuelto?.variantesBusqueda ?? [consulta]) {
-        const { data: coincidencias, error: errorCoincidencias } =
-          await supabase.rpc("buscar_ids_productos_supermercado", {
-            p_consulta: variante,
-            p_cadenas: idsCadenas,
-            p_limite: Math.min(
-              500,
-              Math.max(120, limite * Math.max(idsCadenas?.length ?? 1, 1)),
-            ),
-          });
-        if (errorCoincidencias) throw errorCoincidencias;
-        const idsCoincidentes = (
-          (coincidencias ?? []) as IdProductoSupermercadoRpc[]
-        ).map((item) => item.producto_supermercado_id);
+        const idsCoincidentes = await buscarIdsCoincidentes({
+          variante,
+          cadenas: idsCadenas,
+          limiteRpc: Math.min(
+            500,
+            Math.max(120, limite * Math.max(idsCadenas?.length ?? 1, 1)),
+          ),
+        });
         if (idsCoincidentes.length === 0) continue;
         const resultado = await crearConsultaProductos().in(
           "id",
@@ -269,16 +317,11 @@ export async function GET(request: Request) {
         const resultadosAdicionales = await Promise.all(
           cadenasFaltantes.map(async (cadena) => {
             for (const variante of variantes) {
-              const { data: coincidencias, error: errorCoincidencias } =
-                await supabase.rpc("buscar_ids_productos_supermercado", {
-                  p_consulta: variante,
-                  p_cadenas: [cadena.id],
-                  p_limite: Math.min(100, Math.max(limite, 20)),
-                });
-              if (errorCoincidencias) throw errorCoincidencias;
-              const idsCoincidentes = (
-                (coincidencias ?? []) as IdProductoSupermercadoRpc[]
-              ).map((item) => item.producto_supermercado_id);
+              const idsCoincidentes = await buscarIdsCoincidentes({
+                variante,
+                cadenas: [cadena.id],
+                limiteRpc: Math.min(100, Math.max(limite, 20)),
+              });
               if (idsCoincidentes.length === 0) continue;
 
               const resultado = await crearConsultaProductos([cadena.id]).in(
@@ -366,9 +409,19 @@ export async function GET(request: Request) {
 
     for (const producto of productosSupermercado) {
       const claveProducto = producto.producto_id ?? producto.id;
+      const nombreCatalogo = producto.productos?.nombre ?? producto.nombre_original;
+      const terminoRelevancia = terminoResuelto?.termino ?? consulta;
+      const nombrePreferido =
+        consulta &&
+        puntuacionRelevanciaProducto(
+          producto.nombre_original,
+          terminoRelevancia,
+        ) > puntuacionRelevanciaProducto(nombreCatalogo, terminoRelevancia)
+          ? producto.nombre_original
+          : nombreCatalogo;
       const agrupado = agrupados.get(claveProducto) ?? {
         id: claveProducto,
-        nombre: producto.productos?.nombre ?? producto.nombre_original,
+        nombre: nombrePreferido,
         imagen:
           producto.cadenas_supermercados?.nombre === "Carrefour"
             ? imagenCarrefourConVersion(

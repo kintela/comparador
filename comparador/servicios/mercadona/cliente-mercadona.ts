@@ -11,6 +11,10 @@ import type {
 } from "./tipos-mercadona";
 
 const API_MERCADONA = "https://tienda.mercadona.es/api";
+// Credenciales públicas de búsqueda incluidas por Mercadona en su aplicación web.
+const ALGOLIA_APP_ID = "7UZJKL1DJ0";
+const ALGOLIA_SEARCH_KEY = "9d8f2e39e90df472b4f2e559a116fe17";
+const ALGOLIA_INDEX_PREFIX = "products_prod";
 const MARCAS_PROPIAS = [
   "Hacendado",
   "Bosque Verde",
@@ -50,11 +54,31 @@ function obtenerMarca(nombre: string): string | null {
   );
 }
 
+function obtenerCategoriaMasEspecifica(producto: ProductoApiMercadona) {
+  function aplanar(
+    categorias: NonNullable<ProductoApiMercadona["categories"]>,
+  ): NonNullable<ProductoApiMercadona["categories"]> {
+    return categorias.flatMap((categoria) => [
+      categoria,
+      ...aplanar(categoria.categories ?? []),
+    ]);
+  }
+
+  return aplanar(producto.categories ?? []).sort(
+    (a, b) => (b.level ?? 0) - (a.level ?? 0),
+  )[0]?.name?.trim() ?? null;
+}
+
 function nombreConDescriptores(producto: ProductoApiMercadona) {
   const nombre = producto.display_name.trim();
-  if (!producto.slug) return nombre;
+  const categoria = obtenerCategoriaMasEspecifica(producto);
+  const nombreConCategoria =
+    categoria && !normalizar(nombre).includes(normalizar(categoria))
+      ? `${nombre} ${categoria}`
+      : nombre;
+  if (!producto.slug) return nombreConCategoria;
 
-  const tokensNombre = new Set(normalizar(nombre).split(" "));
+  const tokensNombre = new Set(normalizar(nombreConCategoria).split(" "));
   const tokensIgnorados = new Set([
     "brick",
     "brik",
@@ -76,8 +100,8 @@ function nombreConDescriptores(producto: ProductoApiMercadona) {
     );
 
   return descriptores.length > 0
-    ? `${nombre} ${descriptores.join(" ")}`
-    : nombre;
+    ? `${nombreConCategoria} ${descriptores.join(" ")}`
+    : nombreConCategoria;
 }
 
 function nombreConCantidad(producto: ProductoApiMercadona) {
@@ -114,8 +138,9 @@ function convertirProducto(
     identificadorExterno: producto.id,
     ean: null,
     nombreOriginal: nombreConCantidad(producto),
-    marcaOriginal: obtenerMarca(producto.display_name),
-    categoriaOriginal: producto.categories?.[0]?.name?.trim() ?? null,
+    marcaOriginal:
+      producto.brand?.trim() || obtenerMarca(producto.display_name),
+    categoriaOriginal: obtenerCategoriaMasEspecifica(producto),
     categoriaSugerida: obtenerCategoriaSugerida(consulta),
     precio: rebajado ? precioAnterior : precioActual,
     precioPromocional: rebajado ? precioActual : null,
@@ -205,6 +230,47 @@ export async function rastrearCategoriaMercadona({
   url.searchParams.set("wh", almacen);
   const categoria = await obtenerJson<CategoriaMercadona>(url);
   return extraerProductos(categoria)
+    .map((producto) => convertirProducto(producto, consulta))
+    .filter((producto): producto is ProductoMercadona => producto !== null);
+}
+
+export async function buscarProductosMercadona({
+  consulta,
+  almacen,
+  limite,
+}: {
+  consulta: string;
+  almacen: string;
+  limite: number;
+}): Promise<ProductoMercadona[]> {
+  const indice = `${ALGOLIA_INDEX_PREFIX}_${almacen}_es`;
+  const url = new URL(
+    `https://${ALGOLIA_APP_ID}-dsn.algolia.net/1/indexes/${indice}/query`,
+  );
+  const respuesta = await fetch(url, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Algolia-Application-Id": ALGOLIA_APP_ID,
+      "X-Algolia-API-Key": ALGOLIA_SEARCH_KEY,
+    },
+    body: JSON.stringify({
+      query: consulta,
+      hitsPerPage: limite,
+      analytics: false,
+      clickAnalytics: false,
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!respuesta.ok) {
+    throw new Error(
+      `El buscador de Mercadona respondió con estado ${respuesta.status}`,
+    );
+  }
+  const datos = (await respuesta.json()) as { hits?: ProductoApiMercadona[] };
+  return (datos.hits ?? [])
     .map((producto) => convertirProducto(producto, consulta))
     .filter((producto): producto is ProductoMercadona => producto !== null);
 }

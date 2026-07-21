@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  buscarProductosMercadona,
   obtenerIndiceCategoriasMercadona,
   rastrearCategoriaMercadona,
   resolverZonaMercadona,
@@ -112,39 +113,57 @@ export async function rastrearLoteMercadona({
   for (const consulta of consultas) {
     if (productos.size >= maxProductos) break;
     productosEncontradosPorConsulta[consulta] = 0;
-    const categoriaIds = resolverCategorias(consulta, indice);
-    if (categoriaIds.length === 0) {
-      errores.push({
-        consulta,
-        mensaje: "No se encontró una categoría adecuada para esta búsqueda",
-      });
-      continue;
-    }
-
     const candidatos: ProductoMercadona[] = [];
-    for (const categoriaId of categoriaIds) {
-      if (productos.size >= maxProductos || candidatos.length >= resultadosPorConsulta) {
-        break;
-      }
-      try {
-        let productosCategoria = cacheCategorias.get(categoriaId);
-        if (!productosCategoria) {
-          await esperar(PAUSA_ENTRE_PETICIONES_MS);
-          productosCategoria = await rastrearCategoriaMercadona({
-            categoriaId,
-            almacen: zona.almacen,
-            consulta,
-          });
-          cacheCategorias.set(categoriaId, productosCategoria);
-          peticionesRealizadas += 1;
+    try {
+      candidatos.push(
+        ...(await buscarProductosMercadona({
+          consulta,
+          almacen: zona.almacen,
+          limite: resultadosPorConsulta,
+        })),
+      );
+      peticionesRealizadas += 1;
+    } catch (errorBusqueda) {
+      peticionesRealizadas += 1;
+      // Conservamos la lectura por categorías como respaldo si el proveedor
+      // de búsqueda cambia temporalmente o no está disponible.
+      const categoriaIds = resolverCategorias(consulta, indice);
+      for (const categoriaId of categoriaIds) {
+        if (
+          productos.size >= maxProductos ||
+          candidatos.length >= resultadosPorConsulta
+        ) {
+          break;
         }
-        candidatos.push(...productosCategoria);
-      } catch (error) {
-        peticionesRealizadas += 1;
+        try {
+          let productosCategoria = cacheCategorias.get(categoriaId);
+          if (!productosCategoria) {
+            await esperar(PAUSA_ENTRE_PETICIONES_MS);
+            productosCategoria = await rastrearCategoriaMercadona({
+              categoriaId,
+              almacen: zona.almacen,
+              consulta,
+            });
+            cacheCategorias.set(categoriaId, productosCategoria);
+            peticionesRealizadas += 1;
+          }
+          candidatos.push(...productosCategoria);
+        } catch (error) {
+          peticionesRealizadas += 1;
+          errores.push({
+            consulta,
+            categoriaId,
+            mensaje: error instanceof Error ? error.message : "Error desconocido",
+          });
+        }
+      }
+      if (candidatos.length === 0) {
         errores.push({
           consulta,
-          categoriaId,
-          mensaje: error instanceof Error ? error.message : "Error desconocido",
+          mensaje:
+            errorBusqueda instanceof Error
+              ? errorBusqueda.message
+              : "No se pudo consultar el buscador de Mercadona",
         });
       }
     }

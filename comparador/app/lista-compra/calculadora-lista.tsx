@@ -5,8 +5,10 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { puntuacionRelevanciaProducto } from "@/servicios/busqueda/relevancia-producto";
 import {
   calcularCosteArticulo,
+  crearReferenciaComparacionAutomatica,
   etiquetaCantidadArticulo,
   obtenerPesoMedioPiezaKg,
+  type ReferenciaComparacion,
 } from "@/servicios/lista-compra/calculo-cantidades";
 
 type Oferta = {
@@ -52,6 +54,7 @@ type MejorPrecio = {
 type ResultadoArticulo = {
   articuloId: string;
   precios: Record<string, MejorPrecio>;
+  referenciaComparacion: ReferenciaComparacion | null;
   enCola: boolean;
   error: string | null;
 };
@@ -172,6 +175,7 @@ export function CalculadoraLista() {
           precioReferencia: precio.precioReferencia,
           unidadReferencia: precio.unidadReferencia,
           nombreProducto: precio.nombreProducto,
+          referenciaComparacion: resultado?.referenciaComparacion,
         });
         total += calculo.total;
         estimado ||= calculo.estimado;
@@ -270,20 +274,34 @@ export function CalculadoraLista() {
 
           const precios: Record<string, MejorPrecio> = {};
           const productos = datos.productos ?? [];
-          for (const producto of productos) {
-            if (
-              !esProductoAdecuadoParaLista(
+          const candidatos = productos
+            .map((producto) => ({
+              producto,
+              relevancia: puntuacionRelevanciaProducto(
                 producto.nombre,
                 articulo.termino,
-              )
-            ) {
-              continue;
-            }
-            const relevancia = puntuacionRelevanciaProducto(
-              producto.nombre,
-              articulo.termino,
+              ),
+            }))
+            .filter(
+              ({ producto, relevancia }) =>
+                relevancia > 0 &&
+                esProductoAdecuadoParaLista(
+                  producto.nombre,
+                  articulo.termino,
+                ),
             );
-            if (relevancia <= 0) continue;
+          const referenciaComparacion = crearReferenciaComparacionAutomatica(
+            articulo.termino,
+            candidatos.flatMap(({ producto }) =>
+              producto.ofertas.map((oferta) => ({
+                nombreProducto: producto.nombre,
+                precioReferencia: oferta.precioReferencia,
+                unidadReferencia: oferta.unidadReferencia,
+              })),
+            ),
+          );
+
+          for (const { producto, relevancia } of candidatos) {
             for (const oferta of producto.ofertas) {
               if (!oferta.disponible || !SUPERMERCADOS.includes(
                 oferta.supermercado as (typeof SUPERMERCADOS)[number],
@@ -291,15 +309,20 @@ export function CalculadoraLista() {
                 continue;
               }
               const actual = precios[oferta.supermercado];
-              const costeUnitario = calcularCosteArticulo({
+              const calculoUnitario = calcularCosteArticulo({
                 consulta: articulo.termino,
                 cantidad: 1,
                 precio: oferta.precio,
                 precioReferencia: oferta.precioReferencia,
                 unidadReferencia: oferta.unidadReferencia,
                 nombreProducto: producto.nombre,
-              }).total;
-              const costeActual = actual
+                referenciaComparacion,
+              });
+              // Si existe una unidad común, no mezclamos en la misma fila
+              // envases cuya cantidad no se puede convertir con seguridad.
+              if (referenciaComparacion && !calculoUnitario.normalizado) continue;
+              const costeUnitario = calculoUnitario.total;
+              const calculoActual = actual
                 ? calcularCosteArticulo({
                     consulta: articulo.termino,
                     cantidad: 1,
@@ -307,8 +330,10 @@ export function CalculadoraLista() {
                     precioReferencia: actual.precioReferencia,
                     unidadReferencia: actual.unidadReferencia,
                     nombreProducto: actual.nombreProducto,
-                  }).total
-                : Infinity;
+                    referenciaComparacion,
+                  })
+                : null;
+              const costeActual = calculoActual?.total ?? Infinity;
               if (
                 !actual ||
                 relevancia > actual.relevancia ||
@@ -330,6 +355,7 @@ export function CalculadoraLista() {
           return {
             articuloId: articulo.id,
             precios,
+            referenciaComparacion,
             enCola:
               Object.keys(precios).length === 0 &&
               Boolean(datos.solicitudRastreo?.registrada),
@@ -339,6 +365,7 @@ export function CalculadoraLista() {
           return {
             articuloId: articulo.id,
             precios: {},
+            referenciaComparacion: null,
             enCola: false,
             error:
               error instanceof Error
@@ -686,6 +713,7 @@ function TablaComparacion({
                       {etiquetaCantidadArticulo(
                         articulo.termino,
                         articulo.cantidad,
+                        resultado?.referenciaComparacion,
                       )}
                     </p>
                     {resultado?.enCola && <p className="mt-2 text-xs font-semibold text-[#a56600]">Añadido a la cola de rastreo</p>}
@@ -701,6 +729,8 @@ function TablaComparacion({
                           precioReferencia: precio.precioReferencia,
                           unidadReferencia: precio.unidadReferencia,
                           nombreProducto: precio.nombreProducto,
+                          referenciaComparacion:
+                            resultado?.referenciaComparacion,
                         })
                       : null;
                     return (
@@ -730,8 +760,13 @@ function TablaComparacion({
                                     : ""}
                                 </p>
                                 <p className="mt-1 text-xs text-[#71837c]">
-                                  {moneda(calculo.precioKg ?? 0)} / kg
+                                  {moneda(calculo.precioKg ?? 0)} /{calculo.unidadComparable}
                                 </p>
+                                {calculo.notaComparacion && (
+                                  <p className="mt-1 text-[10px] leading-4 text-[#8a6a2f]">
+                                    {calculo.notaComparacion}
+                                  </p>
+                                )}
                               </>
                             ) : calculo?.estimado ? (
                               <>

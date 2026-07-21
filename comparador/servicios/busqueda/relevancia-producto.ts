@@ -50,6 +50,17 @@ function contienePalabrasCompletas(nombre: string, variante: string) {
   );
 }
 
+function contarPalabrasCoincidentes(nombre: string, variante: string) {
+  const palabrasNombre = new Set(
+    nombre.split(" ").map(singularizarPalabra),
+  );
+  const palabrasConsulta = [
+    ...new Set(variante.split(" ").map(singularizarPalabra)),
+  ];
+  return palabrasConsulta.filter((palabra) => palabrasNombre.has(palabra))
+    .length;
+}
+
 export function puntuacionRelevanciaProducto(
   nombreProducto: string,
   consulta: string,
@@ -70,6 +81,18 @@ export function puntuacionRelevanciaProducto(
     }
     else if (contienePalabrasCompletas(nombre, variante)) {
       mejor = Math.max(mejor, 400);
+    } else {
+      const totalPalabras = new Set(
+        variante.split(" ").map(singularizarPalabra),
+      ).size;
+      const palabrasCoincidentes = contarPalabrasCoincidentes(nombre, variante);
+      const minimoCoincidencias = Math.min(totalPalabras, 2);
+
+      if (palabrasCoincidentes === totalPalabras) {
+        mejor = Math.max(mejor, 300);
+      } else if (palabrasCoincidentes >= minimoCoincidencias) {
+        mejor = Math.max(mejor, 200 + palabrasCoincidentes * 20);
+      }
     }
   }
 
