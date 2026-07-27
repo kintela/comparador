@@ -49,10 +49,11 @@ seudonimizar al solicitante. Nunca se guarda la dirección IP.
 
 ## Rastreos automáticos
 
-Los ocho supermercados se actualizan diariamente mediante Vercel Cron. Los
+Los trece supermercados se actualizan diariamente mediante Vercel Cron. Los
 horarios están definidos en `vercel.json` y siempre se interpretan en UTC.
-Cada supermercado se ejecuta en una hora diferente para evitar concentrar todas
-las peticiones en una misma función.
+En Vercel Pro se ejecutan escalonados cada 15 minutos entre las 03:00 y las
+06:00 UTC para que los precios estén actualizados y exista margen antes del
+correo de las 09:00 en Madrid.
 
 Vercel envía automáticamente `CRON_SECRET` como cabecera
 `Authorization: Bearer ...`. Esta variable debe configurarse en el entorno
@@ -63,17 +64,23 @@ La tabla `bloqueos_rastreo` evita que coincidan dos ejecuciones del mismo
 supermercado, ya sean manuales o automáticas. Las ejecuciones programadas se
 guardan en `ejecuciones_rastreo` con `tipo_rastreo = automatico`.
 
-Después del último rastreo se envía un informe diario por correo mediante la
-ruta `/api/cron/informe-rastreos`. El envío está programado a las 09:30 UTC e
-incluye el estado, duración, productos, nuevos productos, precios y errores de
-cada supermercado.
+Después del último rastreo se envía el resumen diario de ofertas mediante
+`/api/cron/informe-ofertas`. Dos cron diarios llaman a la ruta principal a las
+07:00 UTC y a su ruta de reserva a las 08:00 UTC;
+la propia ruta comprueba la zona `Europe/Madrid` para enviarlo una sola vez a
+partir de las 09:00, tanto en horario de verano como de invierno. Incluye hasta
+12 ofertas vigentes por supermercado y enlaces directos a los productos.
+
+El informe técnico de `/api/cron/informe-rastreos` se mantiene a las 13:30 UTC
+con el estado, duración, productos, nuevos productos, precios y errores de cada
+supermercado.
 
 Para el puerto SMTP 587 debe utilizarse `SMTP_SECURE=false`: la conexión comienza
 sin TLS implícito y se actualiza mediante STARTTLS. Todas las variables SMTP
 deben configurarse también en el entorno Production de Vercel.
 `SMTP_REPORT_TO` es opcional y permite cambiar el destinatario predeterminado.
-Los envíos completados se registran en `informes_rastreo_enviados` para evitar
-correos duplicados.
+Los envíos completados se registran en `informes_rastreo_enviados` e
+`informes_ofertas_enviados` para evitar correos duplicados.
 
 ## Getting Started
 
