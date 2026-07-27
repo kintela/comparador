@@ -1,6 +1,23 @@
 import { obtenerCategoriaSugerida } from "@/servicios/eroski/categorias-eroski";
 import { obtenerVariantesSemanticas } from "@/servicios/busqueda/variantes-semanticas";
 
+const PALABRAS_NO_SIGNIFICATIVAS = new Set([
+  "a",
+  "al",
+  "con",
+  "de",
+  "del",
+  "el",
+  "en",
+  "la",
+  "las",
+  "los",
+  "para",
+  "por",
+  "sin",
+  "y",
+]);
+
 function normalizar(valor: string) {
   return valor
     .normalize("NFD")
@@ -63,10 +80,18 @@ function comienzaPorPalabrasEquivalentes(nombre: string, variante: string) {
 
 function contarPalabrasCoincidentes(nombre: string, variante: string) {
   const palabrasNombre = new Set(
-    nombre.split(" ").map(singularizarPalabra),
+    nombre
+      .split(" ")
+      .map(singularizarPalabra)
+      .filter((palabra) => !PALABRAS_NO_SIGNIFICATIVAS.has(palabra)),
   );
   const palabrasConsulta = [
-    ...new Set(variante.split(" ").map(singularizarPalabra)),
+    ...new Set(
+      variante
+        .split(" ")
+        .map(singularizarPalabra)
+        .filter((palabra) => !PALABRAS_NO_SIGNIFICATIVAS.has(palabra)),
+    ),
   ];
   return palabrasConsulta.filter((palabra) => palabrasNombre.has(palabra))
     .length;
@@ -97,7 +122,10 @@ export function puntuacionRelevanciaProducto(
       mejor = Math.max(mejor, 400);
     } else {
       const totalPalabras = new Set(
-        variante.split(" ").map(singularizarPalabra),
+        variante
+          .split(" ")
+          .map(singularizarPalabra)
+          .filter((palabra) => !PALABRAS_NO_SIGNIFICATIVAS.has(palabra)),
       ).size;
       const palabrasCoincidentes = contarPalabrasCoincidentes(nombre, variante);
       const minimoCoincidencias = Math.min(totalPalabras, 2);

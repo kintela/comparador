@@ -8,6 +8,8 @@ const VARIANTES_POR_TERMINO: Record<string, string[]> = {
     "gel lavadora",
     "polvo lavadora",
   ],
+  "gel de ducha": ["gel de baño"],
+  "gel de baño": ["gel de ducha"],
   gula: ["angula", "angulas"],
 };
 
