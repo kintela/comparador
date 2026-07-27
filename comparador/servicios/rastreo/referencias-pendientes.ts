@@ -16,6 +16,7 @@ const SLUG_CADENA: Record<SupermercadoRastreo, string> = {
   carrefour: "carrefour",
   costco: "costco",
   primaprix: "primaprix",
+  "el-corte-ingles": "el-corte-ingles",
 };
 
 export type ReferenciaPendiente = {

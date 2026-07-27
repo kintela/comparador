@@ -67,6 +67,7 @@ const SUPERMERCADOS = [
   "Costco",
   "Covirán",
   "DIA",
+  "El Corte Inglés",
   "Eroski",
   "Lidl",
   "Lupa",

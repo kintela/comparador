@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useState, type FormEvent } from "react";
 
+import { puntuacionRelevanciaProducto } from "@/servicios/busqueda/relevancia-producto";
+
 type Oferta = {
   supermercado: string;
   tienda: string;
@@ -54,6 +56,7 @@ const SUPERMERCADOS = [
   "Costco",
   "Covirán",
   "DIA",
+  "El Corte Inglés",
   "Eroski",
   "Lidl",
   "Lupa",
@@ -99,11 +102,17 @@ export function BuscadorProductos() {
   const [supermercadosSeleccionados, setSupermercadosSeleccionados] = useState<
     string[]
   >([...SUPERMERCADOS]);
-  const productosOrdenados = [...(resultado?.productos ?? [])].sort(
-    (a, b) =>
+  const productosOrdenados = [...(resultado?.productos ?? [])].sort((a, b) => {
+    const termino = resultado?.consulta ?? consulta;
+    const diferenciaRelevancia =
+      puntuacionRelevanciaProducto(b.nombre, termino) -
+      puntuacionRelevanciaProducto(a.nombre, termino);
+    return (
+      diferenciaRelevancia ||
       Math.min(...a.ofertas.map((oferta) => oferta.precio)) -
-      Math.min(...b.ofertas.map((oferta) => oferta.precio)),
-  );
+        Math.min(...b.ofertas.map((oferta) => oferta.precio))
+    );
+  });
 
   async function buscar(
     valor: string,
@@ -311,6 +320,12 @@ export function BuscadorProductos() {
 
         {resultado?.ok && productosOrdenados.length > 0 && (
           <div>
+            {resultado.solicitudRastreo?.registrada && (
+              <div className="mb-5 rounded-2xl border border-[#16805e]/20 bg-[#e7f5ee] px-4 py-3 text-sm text-[#176b50]">
+                Mostramos los resultados disponibles y hemos solicitado completar
+                la cobertura en los supermercados pendientes.
+              </div>
+            )}
             <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-[#16805e]">Resultados</p>

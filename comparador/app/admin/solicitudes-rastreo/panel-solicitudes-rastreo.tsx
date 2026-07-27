@@ -53,6 +53,7 @@ const RASTREADORES = [
   { cadena: "Carrefour", ruta: "carrefour" },
   { cadena: "Costco", ruta: "costco" },
   { cadena: "DIA", ruta: "dia" },
+  { cadena: "El Corte Inglés", ruta: "el-corte-ingles" },
   { cadena: "Eroski", ruta: "eroski" },
   { cadena: "Lidl", ruta: "lidl" },
   { cadena: "Lupa", ruta: "lupa" },

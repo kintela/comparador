@@ -76,6 +76,21 @@ const nextConfig: NextConfig = {
         hostname: "media.primaprix.eu",
         pathname: "/primaprix-media/**",
       },
+      {
+        protocol: "https",
+        hostname: "sgfm.elcorteingles.es",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "cdn.grupoelcorteingles.es",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "dam.elcorteingles.es",
+        pathname: "/**",
+      },
     ],
   },
 };

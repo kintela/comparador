@@ -83,6 +83,13 @@ const RASTREADORES = [
     href: "/admin/rastreo/primaprix",
     color: "border-pink-500/40 hover:border-pink-400",
   },
+  {
+    nombre: "El Corte Inglés",
+    descripcion:
+      "Catálogo oficial del Supermercado El Corte Inglés y sus promociones.",
+    href: "/admin/rastreo/el-corte-ingles",
+    color: "border-emerald-500/40 hover:border-emerald-400",
+  },
 ];
 
 export default function PaginaRastreos() {

@@ -281,6 +281,7 @@ export async function GET(request: Request) {
 
     let data: unknown[] = [];
     if (consulta) {
+      const productosPorId = new Map<string, unknown>();
       for (const variante of terminoResuelto?.variantesBusqueda ?? [consulta]) {
         const idsCoincidentes = await buscarIdsCoincidentes({
           variante,
@@ -296,9 +297,11 @@ export async function GET(request: Request) {
           idsCoincidentes,
         );
         if (resultado.error) throw resultado.error;
-        data = resultado.data ?? [];
-        if (data.length > 0) break;
+        for (const producto of (resultado.data ?? []) as Array<{ id: string }>) {
+          productosPorId.set(producto.id, producto);
+        }
       }
+      data = [...productosPorId.values()];
 
       if (
         asegurarCobertura &&
@@ -316,6 +319,7 @@ export async function GET(request: Request) {
         const variantes = terminoResuelto?.variantesBusqueda ?? [consulta];
         const resultadosAdicionales = await Promise.all(
           cadenasFaltantes.map(async (cadena) => {
+            const productosCadena = new Map<string, unknown>();
             for (const variante of variantes) {
               const idsCoincidentes = await buscarIdsCoincidentes({
                 variante,
@@ -329,11 +333,13 @@ export async function GET(request: Request) {
                 idsCoincidentes,
               );
               if (resultado.error) throw resultado.error;
-              if ((resultado.data?.length ?? 0) > 0) {
-                return resultado.data ?? [];
+              for (const producto of (resultado.data ?? []) as Array<{
+                id: string;
+              }>) {
+                productosCadena.set(producto.id, producto);
               }
             }
-            return [];
+            return [...productosCadena.values()];
           }),
         );
         const productosUnicos = new Map<string, unknown>();
@@ -490,7 +496,17 @@ export async function GET(request: Request) {
             terminoResuelto?.termino ?? consulta,
           ) > 0,
       )
-      .sort((a, b) => (a.ofertas[0]?.precio ?? Infinity) - (b.ofertas[0]?.precio ?? Infinity));
+      .sort((a, b) => {
+        const termino = terminoResuelto?.termino ?? consulta;
+        const diferenciaRelevancia =
+          puntuacionRelevanciaProducto(b.nombre, termino) -
+          puntuacionRelevanciaProducto(a.nombre, termino);
+        return (
+          diferenciaRelevancia ||
+          (a.ofertas[0]?.precio ?? Infinity) -
+            (b.ofertas[0]?.precio ?? Infinity)
+        );
+      });
     const productos = productosCoincidentes.slice(0, limite);
     if (asegurarCobertura && supermercados.length > 0) {
       const idsIncluidos = new Set(productos.map((producto) => producto.id));
@@ -548,13 +564,25 @@ export async function GET(request: Request) {
       });
     }
 
-    const supermercadosEncontrados = [
+    const supermercadosConResultados = [
       ...new Set(
         productosCoincidentes.flatMap((producto) =>
           producto.ofertas.map((oferta) => oferta.supermercado),
         ),
       ),
     ];
+    const supermercadoTieneCoberturaSuficiente = (supermercado: string) => {
+      const candidatos = productosCoincidentes.filter((producto) =>
+        producto.ofertas.some(
+          (oferta) =>
+            oferta.supermercado === supermercado && oferta.disponible,
+        ),
+      );
+      return candidatos.length >= 5;
+    };
+    const supermercadosEncontrados = supermercadosConResultados.filter(
+      supermercadoTieneCoberturaSuficiente,
+    );
     if (consulta && terminoResuelto) {
       await reconciliarSolicitudConCatalogo({
         terminoNormalizado: terminoResuelto.normalizado,

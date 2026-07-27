@@ -16,6 +16,7 @@ const SUPERMERCADOS = [
   { slug: "carrefour", nombre: "Carrefour" },
   { slug: "costco", nombre: "Costco" },
   { slug: "primaprix", nombre: "Primaprix" },
+  { slug: "el-corte-ingles", nombre: "El Corte Inglés" },
 ] as const;
 
 type EjecucionDb = {

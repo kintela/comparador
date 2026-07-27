@@ -764,6 +764,49 @@ async function ejecutarRastreo(
       });
       return sumarReferencias(resumen, extra);
     }
+    case "el-corte-ingles": {
+      const [
+        { rastrearLoteElCorteIngles },
+        { guardarRastreoElCorteIngles },
+      ] = await Promise.all([
+        import("@/servicios/el-corte-ingles/rastreo-lote"),
+        import("@/servicios/el-corte-ingles/persistencia-el-corte-ingles"),
+      ]);
+      const resultado = await rastrearLoteElCorteIngles(parametros);
+      const persistencia = await guardarRastreoElCorteIngles({
+        productos: resultado.productos,
+        consultas,
+        errores: resultado.errores,
+        centroEntrega: resultado.centroEntrega,
+        tipoRastreo,
+      });
+      const procesadas = await guardarResultadosSolicitudes(
+        supermercado,
+        solicitudes,
+        resultado,
+      );
+      const resumen = crearResumen(resultado, persistencia, procesadas);
+      const extra = await completarReferencias({
+        supermercado,
+        desde: inicioActualizacion,
+        rastrear: (consultasFallback) =>
+          rastrearLoteElCorteIngles({
+            consultas: consultasFallback,
+            resultadosPorConsulta,
+            maxProductos: consultasFallback.length * resultadosPorConsulta,
+            permitirVacio: true,
+          }),
+        persistir: (productos, resultadoFallback, consultasFallback) =>
+          guardarRastreoElCorteIngles({
+            productos,
+            consultas: consultasFallback,
+            errores: resultadoFallback.errores,
+            centroEntrega: resultadoFallback.centroEntrega,
+            tipoRastreo,
+          }),
+      });
+      return sumarReferencias(resumen, extra);
+    }
   }
 }
 

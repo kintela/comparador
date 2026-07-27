@@ -15,6 +15,7 @@ const NOMBRE_POR_SLUG: Record<string, string> = {
   carrefour: "Carrefour",
   costco: "Costco",
   primaprix: "Primaprix",
+  "el-corte-ingles": "El Corte Inglés",
 };
 
 type ProgresoDb = {

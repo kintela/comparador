@@ -50,8 +50,12 @@
       "schedule": "5 11 * * *"
     },
     {
+      "path": "/api/cron/rastreo/el-corte-ingles",
+      "schedule": "5 12 * * *"
+    },
+    {
       "path": "/api/cron/informe-rastreos",
-      "schedule": "30 12 * * *"
+      "schedule": "30 13 * * *"
     }
   ]
 }

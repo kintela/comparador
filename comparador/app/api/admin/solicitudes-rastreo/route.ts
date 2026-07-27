@@ -22,6 +22,7 @@ const SLUG_POR_CADENA: Record<string, string> = {
   "Covirán": "coviran",
   DIA: "dia",
   Eroski: "eroski",
+  "El Corte Inglés": "el-corte-ingles",
   Lidl: "lidl",
   Lupa: "lupa",
   Mercadona: "mercadona",

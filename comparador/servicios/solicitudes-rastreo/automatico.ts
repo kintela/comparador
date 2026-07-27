@@ -17,6 +17,7 @@ const NOMBRE_POR_SUPERMERCADO: Record<SupermercadoRastreo, string> = {
   carrefour: "Carrefour",
   costco: "Costco",
   primaprix: "Primaprix",
+  "el-corte-ingles": "El Corte Inglés",
 };
 
 type ProgresoSolicitud = {

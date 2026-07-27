@@ -50,6 +50,17 @@ function contienePalabrasCompletas(nombre: string, variante: string) {
   );
 }
 
+function comienzaPorPalabrasEquivalentes(nombre: string, variante: string) {
+  const palabrasNombre = nombre.split(" ").map(singularizarPalabra);
+  const palabrasVariante = variante.split(" ").map(singularizarPalabra);
+  return (
+    palabrasVariante.length > 0 &&
+    palabrasVariante.every(
+      (palabra, indice) => palabrasNombre[indice] === palabra,
+    )
+  );
+}
+
 function contarPalabrasCoincidentes(nombre: string, variante: string) {
   const palabrasNombre = new Set(
     nombre.split(" ").map(singularizarPalabra),
@@ -75,7 +86,10 @@ export function puntuacionRelevanciaProducto(
       comienzaPorConsulta = true;
       mejor = Math.max(mejor, 1000);
     }
-    else if (nombre.startsWith(`${variante} `)) {
+    else if (
+      nombre.startsWith(`${variante} `) ||
+      comienzaPorPalabrasEquivalentes(nombre, variante)
+    ) {
       comienzaPorConsulta = true;
       mejor = Math.max(mejor, 800);
     }
@@ -97,19 +111,32 @@ export function puntuacionRelevanciaProducto(
   }
 
   if (obtenerCategoriaSugerida(consulta) === "Frutas") {
+    const formatoFrutaFresca =
+      /\b(al peso|a granel|pieza|malla|bandeja|kg|kilo|kilos)\b/.test(nombre);
     if (
-      /\b(golosina|gominola|caramelo|bebida|refresco|zumo|yogur|yogurt|postre|gelatina|mermelada|sorbete|helado|stick|vaso|lata|conserva|almibar|gajos|ambientador|jabon|gel|champu|vodka|licor|potito|tarrito|galleta|chocolate|dulce|agua|colonia|spray|smoothie|preparado|flan|natillas|soja)\b/.test(
+      /\b(golosina|gominola|caramelo|bebida|refresco|yogur|yogurt|postre|gelatina|mermelada|sorbete|helado|stick|vaso|lata|conserva|almibar|gajos|ambientador|jabon|gel|champu|vodka|licor|potito|tarrito|galleta|chocolate|dulce|agua|colonia|spray|smoothie|preparado|flan|natillas|soja)\b/.test(
         nombre,
       )
     ) {
       return 0;
     }
-    const formatoFrutaFresca =
-      /\b(al peso|a granel|pieza|malla|bandeja|kg|kilo|kilos)\b/.test(nombre);
+    // “Naranja para zumo malla” es fruta fresca; “zumo de naranja” no.
+    if (/\bzumo\b/.test(nombre) && !formatoFrutaFresca) return 0;
     if (!comienzaPorConsulta && !formatoFrutaFresca) return 0;
     if (/\b(al peso|a granel|pieza|malla|bandeja)\b/.test(nombre)) {
       mejor += 150;
     }
+  }
+
+  if (
+    variantes.some((variante) =>
+      variante.split(" ").map(singularizarPalabra).includes("patata"),
+    ) &&
+    /\b(frita|fritas|prefrita|tortilla|ali oli|alioli|gnocchi|finisima|al corte|entera|pure|snack)\b/.test(
+      nombre,
+    )
+  ) {
+    return 0;
   }
 
   return mejor;
