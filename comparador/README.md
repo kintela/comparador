@@ -21,7 +21,8 @@ SMTP_USER=correo@ejemplo.net
 SMTP_PASSWORD=contraseña-smtp
 SMTP_FROM_EMAIL=correo@ejemplo.net
 SMTP_SECURE=false
-SMTP_REPORT_TO=destinatario@ejemplo.net
+SMTP_REPORT_TO=persona1@ejemplo.net,persona2@ejemplo.net
+SMTP_TECHNICAL_REPORT_TO=roberto.quintela@protonmail.com
 ```
 
 En producción, configura la misma variable en Vercel. La previsualización no escribe
@@ -78,7 +79,9 @@ supermercado.
 Para el puerto SMTP 587 debe utilizarse `SMTP_SECURE=false`: la conexión comienza
 sin TLS implícito y se actualiza mediante STARTTLS. Todas las variables SMTP
 deben configurarse también en el entorno Production de Vercel.
-`SMTP_REPORT_TO` es opcional y permite cambiar el destinatario predeterminado.
+`SMTP_REPORT_TO` admite varios destinatarios separados por comas y se utiliza
+solo para el resumen de ofertas. `SMTP_TECHNICAL_REPORT_TO` se utiliza para el
+informe técnico y es obligatorio.
 Los envíos completados se registran en `informes_rastreo_enviados` e
 `informes_ofertas_enviados` para evitar correos duplicados.
 

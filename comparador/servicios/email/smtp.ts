@@ -29,10 +29,17 @@ function configuracionSmtp() {
   };
 }
 
-export function obtenerDestinatarioInforme(): string {
+const DESTINATARIO_OFERTAS_PREDETERMINADO =
+  "roberto.quintela@protonmail.com";
+
+export function obtenerDestinatarioInformeOfertas(): string {
   return (
-    process.env.SMTP_REPORT_TO?.trim() || "roberto.quintela@protonmail.com"
+    process.env.SMTP_REPORT_TO?.trim() || DESTINATARIO_OFERTAS_PREDETERMINADO
   );
+}
+
+export function obtenerDestinatarioInformeTecnico(): string {
+  return variableObligatoria("SMTP_TECHNICAL_REPORT_TO");
 }
 
 export async function verificarServidorSmtp(): Promise<void> {

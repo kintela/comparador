@@ -1,6 +1,9 @@
 import "server-only";
 
-import { enviarCorreo, obtenerDestinatarioInforme } from "@/servicios/email/smtp";
+import {
+  enviarCorreo,
+  obtenerDestinatarioInformeTecnico,
+} from "@/servicios/email/smtp";
 import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
 const SUPERMERCADOS = [
@@ -244,7 +247,7 @@ export async function crearYEnviarInformeRastreos(): Promise<{
     timeZone: "Europe/Madrid",
   }).format(ahora);
   const tieneIncidencias = filas.some((fila) => fila.estado !== "completado");
-  const destinatario = obtenerDestinatarioInforme();
+  const destinatario = obtenerDestinatarioInformeTecnico();
   const { messageId } = await enviarCorreo({
     destinatario,
     asunto: `${tieneIncidencias ? "⚠️ " : ""}Informe de rastreos · ${fechaLocal}`,

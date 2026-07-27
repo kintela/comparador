@@ -1,6 +1,9 @@
 import "server-only";
 
-import { enviarCorreo, obtenerDestinatarioInforme } from "@/servicios/email/smtp";
+import {
+  enviarCorreo,
+  obtenerDestinatarioInformeOfertas,
+} from "@/servicios/email/smtp";
 import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
 const ZONA_HORARIA = "Europe/Madrid";
@@ -264,7 +267,7 @@ export async function crearYEnviarInformeOfertas(): Promise<{
     timeZone: ZONA_HORARIA,
   }).format(ahora);
   const ofertas = await obtenerOfertasVigentes(ahora);
-  const destinatario = obtenerDestinatarioInforme();
+  const destinatario = obtenerDestinatarioInformeOfertas();
   const { messageId } = await enviarCorreo({
     destinatario,
     asunto: `Ofertas del día · ${fechaLocal}`,
