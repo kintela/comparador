@@ -614,7 +614,10 @@ async function ejecutarRastreo(
           import("@/servicios/coviran/rastreo-lote"),
           import("@/servicios/coviran/persistencia-coviran"),
         ]);
-      const resultado = await rastrearLoteCoviran(parametros);
+      const resultado = await rastrearLoteCoviran({
+        ...parametros,
+        incluirCatalogoCompleto: true,
+      });
       const persistencia = await guardarRastreoCoviran({
         productos: resultado.productos,
         consultas,

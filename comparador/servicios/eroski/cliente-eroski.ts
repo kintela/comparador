@@ -5,6 +5,7 @@ import type { ResultadoRastreoEroski } from "./tipos-eroski";
 
 const ORIGEN_EROSKI = "https://supermercado.eroski.es";
 const TAMANO_MAXIMO_HTML = 5_000_000;
+const TIEMPO_MAXIMO_RESPUESTA_MS = 45_000;
 
 function normalizarConsultaEroski(consulta: string) {
   return consulta
@@ -35,7 +36,7 @@ export async function rastrearProductosEroski(
       "User-Agent":
         "ComparadorPrecios/0.1 (rastreador de precios en desarrollo)",
     },
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(TIEMPO_MAXIMO_RESPUESTA_MS),
   });
 
   if (!respuesta.ok) {

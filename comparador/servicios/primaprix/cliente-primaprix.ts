@@ -9,6 +9,7 @@ import type { ProductoPrimaprix } from "./tipos-primaprix";
 
 const ORIGEN_PRIMAPRIX = "https://primaprix.eu";
 const URL_CATALOGO = `${ORIGEN_PRIMAPRIX}/es/catalogo/`;
+const URL_BUSQUEDA = `${ORIGEN_PRIMAPRIX}/es/`;
 const PERFILES = [
   "home-lover",
   "cazaofertas",
@@ -116,6 +117,114 @@ async function descargarPerfil(perfil: string): Promise<ProductoCatalogo[]> {
     );
   }
   return parsearCatalogo(await respuesta.text(), perfil);
+}
+
+async function descargarHtml(url: URL | string, contexto: string) {
+  const respuesta = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "es-ES,es;q=0.9",
+      "User-Agent": USER_AGENT,
+    },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!respuesta.ok) {
+    throw new Error(
+      `Primaprix respondió con estado ${respuesta.status} para ${contexto}`,
+    );
+  }
+  return respuesta.text();
+}
+
+function parsearFichaProducto(
+  html: string,
+  urlProducto: string,
+  consulta: string,
+): ProductoPrimaprix | null {
+  const $ = cheerio.load(html);
+  const identificadorExterno = slugProducto(urlProducto);
+  const marca = $(".product-details__name").first().text().trim();
+  const nombre = $(".product-details__brand").first().text().trim();
+  const precio = extraerPrecio(
+    $(".product-details__only-price").first().text() ||
+      $(".product-details__discounted-price span").first().text(),
+  );
+  const urlImagen =
+    $(".product-details__image img").first().attr("src")?.trim() ??
+    $('meta[property="og:image"]').attr("content")?.trim();
+  const tokens = normalizarTerminoRastreo(consulta).split(" ").filter(Boolean);
+  const textoBusqueda = normalizarTerminoRastreo(`${marca} ${nombre}`);
+
+  if (
+    !identificadorExterno ||
+    !nombre ||
+    precio === null ||
+    !tokens.every((token) => textoBusqueda.includes(token))
+  ) {
+    return null;
+  }
+
+  return {
+    identificadorExterno,
+    ean: null,
+    nombreOriginal: nombre,
+    marcaOriginal: marca || null,
+    categoriaOriginal: "busqueda-web",
+    categoriaSugerida: obtenerCategoriaSugerida(consulta),
+    precio,
+    precioPromocional: null,
+    precioReferencia: null,
+    unidadReferencia: null,
+    textoPromocion: null,
+    fechaInicioPromocion: null,
+    fechaFinPromocion: null,
+    disponible: true,
+    urlProducto,
+    urlImagen: urlImagen
+      ? new URL(urlImagen, ORIGEN_PRIMAPRIX).toString()
+      : null,
+  };
+}
+
+export async function buscarEnWebPrimaprix({
+  consulta,
+  limite,
+}: {
+  consulta: string;
+  limite: number;
+}): Promise<{ productos: ProductoPrimaprix[]; peticionesRealizadas: number }> {
+  const url = new URL(URL_BUSQUEDA);
+  url.searchParams.set("s", consulta);
+  const htmlBusqueda = await descargarHtml(url, `la búsqueda “${consulta}”`);
+  const $ = cheerio.load(htmlBusqueda);
+  const enlaces = [
+    ...new Set(
+      $("h2.entry-title a")
+        .map((_, enlace) => $(enlace).attr("href")?.trim())
+        .get()
+        .filter(
+          (enlace): enlace is string =>
+            Boolean(enlace) && enlace.includes("/es/producto/"),
+        ),
+    ),
+  ].slice(0, limite);
+  const fichas = await Promise.all(
+    enlaces.map(async (enlace) =>
+      parsearFichaProducto(
+        await descargarHtml(enlace, `el producto ${slugProducto(enlace) ?? enlace}`),
+        enlace,
+        consulta,
+      ),
+    ),
+  );
+
+  return {
+    productos: fichas.filter(
+      (producto): producto is ProductoPrimaprix => producto !== null,
+    ),
+    peticionesRealizadas: 1 + enlaces.length,
+  };
 }
 
 export async function cargarCatalogoPrimaprix(): Promise<{

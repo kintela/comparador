@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   buscarEnCatalogoPrimaprix,
+  buscarEnWebPrimaprix,
   cargarCatalogoPrimaprix,
 } from "./cliente-primaprix";
 import type {
@@ -28,10 +29,12 @@ export async function rastrearLotePrimaprix({
   const catalogo = await cargarCatalogoPrimaprix();
   const productos = new Map<string, ProductoPrimaprix>();
   const encontradosPorConsulta: Record<string, number> = {};
+  const errores: ErrorRastreoPrimaprix[] = [];
+  let peticionesRealizadas = catalogo.peticionesRealizadas;
 
   for (const consulta of consultas) {
     if (productos.size >= maxProductos) break;
-    const encontrados = buscarEnCatalogoPrimaprix({
+    let encontrados = buscarEnCatalogoPrimaprix({
       catalogo: catalogo.productos,
       consulta,
       limite: Math.min(
@@ -39,6 +42,26 @@ export async function rastrearLotePrimaprix({
         maxProductos - productos.size,
       ),
     });
+    if (encontrados.length === 0) {
+      try {
+        const resultadoWeb = await buscarEnWebPrimaprix({
+          consulta,
+          limite: Math.min(
+            resultadosPorConsulta,
+            maxProductos - productos.size,
+          ),
+        });
+        peticionesRealizadas += resultadoWeb.peticionesRealizadas;
+        encontrados = resultadoWeb.productos;
+      } catch (error) {
+        errores.push({
+          consulta,
+          pagina: 1,
+          mensaje:
+            error instanceof Error ? error.message : "Error desconocido",
+        });
+      }
+    }
     encontradosPorConsulta[consulta] = encontrados.length;
     for (const producto of encontrados) {
       productos.set(producto.identificadorExterno, producto);
@@ -53,8 +76,8 @@ export async function rastrearLotePrimaprix({
 
   return {
     productos: [...productos.values()].slice(0, maxProductos),
-    peticionesRealizadas: catalogo.peticionesRealizadas,
-    errores: [],
+    peticionesRealizadas,
+    errores,
     resultadosPorConsulta: encontradosPorConsulta,
   };
 }

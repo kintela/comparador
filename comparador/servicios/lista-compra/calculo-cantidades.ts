@@ -37,16 +37,23 @@ type ProductoMedible = {
   unidadReferencia: string | null;
 };
 
-function singularizar(termino: string) {
-  if (termino.length > 4 && termino.endsWith("es")) return termino.slice(0, -2);
-  if (termino.length > 3 && termino.endsWith("s")) return termino.slice(0, -1);
-  return termino;
-}
-
 export function obtenerPesoMedioPiezaKg(consulta: string): number | null {
   const termino = crearSlug(consulta).replaceAll("-", " ");
   const ultimaPalabra = termino.split(" ").at(-1) ?? termino;
-  return PESO_MEDIO_KG_POR_PIEZA[singularizar(ultimaPalabra)] ?? null;
+  const candidatas = [
+    ultimaPalabra,
+    ultimaPalabra.length > 3 && ultimaPalabra.endsWith("s")
+      ? ultimaPalabra.slice(0, -1)
+      : "",
+    ultimaPalabra.length > 4 && ultimaPalabra.endsWith("es")
+      ? ultimaPalabra.slice(0, -2)
+      : "",
+  ];
+  for (const candidata of candidatas) {
+    const peso = PESO_MEDIO_KG_POR_PIEZA[candidata];
+    if (peso !== undefined) return peso;
+  }
+  return null;
 }
 
 function esPrecioPorKilogramo(unidad: string | null) {
@@ -287,7 +294,7 @@ export function calcularCosteArticulo({
   }
 
   const pesoMedioPiezaKg = obtenerPesoMedioPiezaKg(consulta);
-  const ventaAlPeso = /\b(al peso|a granel)\b/.test(
+  const ventaAlPeso = /\b(al peso|a granel|kilo)\b/.test(
     crearSlug(nombreProducto ?? "").replaceAll("-", " "),
   );
   const precioKg =

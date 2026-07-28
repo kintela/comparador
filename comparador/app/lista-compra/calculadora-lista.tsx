@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { puntuacionRelevanciaProducto } from "@/servicios/busqueda/relevancia-producto";
@@ -25,6 +26,7 @@ type Oferta = {
 type Producto = {
   id: string;
   nombre: string;
+  imagen: string | null;
   categoria: string | null;
   ofertas: Oferta[];
 };
@@ -47,6 +49,7 @@ type MejorPrecio = {
   precioReferencia: number | null;
   unidadReferencia: string | null;
   nombreProducto: string;
+  imagenProducto: string | null;
   urlProducto: string | null;
   relevancia: number;
 };
@@ -95,14 +98,35 @@ function esProductoAdecuadoParaLista(
   consulta: string,
 ) {
   const termino = normalizarTermino(consulta);
-  if (!["brocoli", "brocolis"].includes(termino)) return true;
-
   const nombre = normalizarTermino(nombreProducto);
-  if (!/\bbrocolis?\b/.test(nombre)) return false;
 
-  return !/\b(coliflor|zanahoria|pescado|filete|cobertura|mezcla|mix|crema|sopa|pure|tortilla|pizza|pasta|arroz|espinaca|platano|pina|smoothie|tarrito|ensalada|kit)\b/.test(
-    nombre,
-  );
+  if (["brocoli", "brocolis"].includes(termino)) {
+    if (!/\bbrocolis?\b/.test(nombre)) return false;
+    return !/\b(coliflor|zanahoria|pescado|filete|cobertura|mezcla|mix|crema|sopa|pure|tortilla|pizza|pasta|arroz|espinaca|platano|pina|smoothie|tarrito|ensalada|kit)\b/.test(
+      nombre,
+    );
+  }
+
+  if (["tomate", "tomates"].includes(termino)) {
+    if (!/\btomates?\b/.test(nombre)) return false;
+    return !/\b(frito|frita|triturado|triturada|rallado|rallada|pelado|pelada|seco|seca|concentrado|concentrada|cocinado|cocinada|guisado|guisada|preparado|preparada|salsa|sofrito|ketchup|gazpacho|salmorejo|zumo|jugo|pure|crema|conserva|brik|brick|lata|bote|frasco|pizza|pasta)\b/.test(
+      nombre,
+    );
+  }
+
+  if (["melon", "melones"].includes(termino)) {
+    if (!/\bmelon(?:es)?\b/.test(nombre)) return false;
+    return !/\b(sandias?|golosina|gominola|caramelo|chicle|bolsa|semilla|semillas)\b/.test(
+      nombre,
+    );
+  }
+
+  if (["sandia", "sandias"].includes(termino)) {
+    if (!/\bsandias?\b/.test(nombre)) return false;
+    return !/\bmelon(?:es)?\b/.test(nombre);
+  }
+
+  return true;
 }
 
 function moneda(valor: number) {
@@ -110,6 +134,23 @@ function moneda(valor: number) {
     style: "currency",
     currency: "EUR",
   });
+}
+
+function requiereCargaDirecta(url: string) {
+  if (
+    url.startsWith("/api/imagenes/coviran") ||
+    url.startsWith("/api/imagenes/carrefour")
+  ) {
+    return true;
+  }
+  try {
+    return [
+      "www.lupaonline.com",
+      "www.compraonline.alcampo.es",
+    ].includes(new URL(url).hostname);
+  } catch {
+    return false;
+  }
 }
 
 export function CalculadoraLista() {
@@ -267,6 +308,7 @@ export function CalculadoraLista() {
 
           const respuesta = await fetch(
             `/api/productos/buscar?${parametros.toString()}`,
+            { cache: "no-store" },
           );
           const datos = (await respuesta.json()) as RespuestaBusqueda;
           if (!respuesta.ok || !datos.ok) {
@@ -346,6 +388,7 @@ export function CalculadoraLista() {
                   precioReferencia: oferta.precioReferencia,
                   unidadReferencia: oferta.unidadReferencia,
                   nombreProducto: producto.nombre,
+                  imagenProducto: producto.imagen,
                   urlProducto: oferta.urlProducto,
                   relevancia,
                 };
@@ -567,12 +610,20 @@ function TablaComparacion({
   const [supermercadosVisibles, setSupermercadosVisibles] = useState<string[]>([
     ...SUPERMERCADOS,
   ]);
-  const visibles = SUPERMERCADOS.filter((supermercado) =>
-    supermercadosVisibles.includes(supermercado),
+  const ordenOriginal = new Map<string, number>(
+    SUPERMERCADOS.map((supermercado, indice) => [supermercado, indice]),
   );
-  const totalesVisibles = totales.filter((total) =>
-    supermercadosVisibles.includes(total.supermercado),
-  );
+  const totalesVisibles = totales
+    .filter((total) => supermercadosVisibles.includes(total.supermercado))
+    .sort((a, b) => {
+      if (a.completa !== b.completa) return a.completa ? -1 : 1;
+      if (a.completa && b.completa) return a.total - b.total;
+      return (
+        (ordenOriginal.get(a.supermercado) ?? Infinity) -
+        (ordenOriginal.get(b.supermercado) ?? Infinity)
+      );
+    });
+  const visibles = totalesVisibles.map((total) => total.supermercado);
   const completas = totalesVisibles.filter((total) => total.completa);
   const totalMasBarato = Math.min(
     ...completas.map((total) => total.total),
@@ -738,6 +789,26 @@ function TablaComparacion({
                       <td key={supermercado} className="px-4 py-4 text-center align-top">
                         {precio ? (
                           <div>
+                            {precio.imagenProducto && (
+                              <a
+                                href={precio.urlProducto ?? precio.imagenProducto}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="relative mx-auto mb-3 block size-20 overflow-hidden rounded-xl bg-[#f7f5ee]"
+                                aria-label={`Ver ${precio.nombreProducto}`}
+                              >
+                                <Image
+                                  src={precio.imagenProducto}
+                                  alt={precio.nombreProducto}
+                                  fill
+                                  unoptimized={requiereCargaDirecta(
+                                    precio.imagenProducto,
+                                  )}
+                                  sizes="80px"
+                                  className="object-contain p-1.5"
+                                />
+                              </a>
+                            )}
                             {precio.urlProducto ? (
                               <a href={precio.urlProducto} target="_blank" rel="noreferrer" className="text-lg font-extrabold text-[#176b50] hover:underline">
                                 {calculo?.estimado ? "≈ " : ""}

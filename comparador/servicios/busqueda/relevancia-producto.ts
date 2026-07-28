@@ -148,6 +148,9 @@ export function puntuacionRelevanciaProducto(
     ) {
       return 0;
     }
+    // El formato por peso no basta para relacionar frutas distintas:
+    // una malla de naranjas no es una coincidencia para “mandarinas”.
+    if (mejor === 0) return 0;
     // “Naranja para zumo malla” es fruta fresca; “zumo de naranja” no.
     if (/\bzumo\b/.test(nombre) && !formatoFrutaFresca) return 0;
     if (!comienzaPorConsulta && !formatoFrutaFresca) return 0;
@@ -163,6 +166,44 @@ export function puntuacionRelevanciaProducto(
     /\b(frita|fritas|prefrita|tortilla|ali oli|alioli|gnocchi|finisima|al corte|entera|pure|snack)\b/.test(
       nombre,
     )
+  ) {
+    return 0;
+  }
+
+  const consultaNormalizada = normalizar(consulta);
+  if (
+    ["melon", "melones"].includes(consultaNormalizada) &&
+    /\b(sandias?|golosina|gominola|caramelo|chicle|bolsa|semilla|semillas)\b/.test(
+      nombre,
+    )
+  ) {
+    return 0;
+  }
+  if (
+    ["sandia", "sandias"].includes(consultaNormalizada) &&
+    /\bmelon(?:es)?\b/.test(nombre)
+  ) {
+    return 0;
+  }
+  if (
+    consultaNormalizada === "sal negra" &&
+    !/\bsal(?:\s+(?:marina|himalaya|del\s+himalaya))?\s+negra\b/.test(nombre)
+  ) {
+    return 0;
+  }
+  if (
+    /\bpicos?\b/.test(consultaNormalizada) &&
+    /\b(barra|baguette|hogaza|chapata|moscatel|vino|orujo|licor|crema|queso|ginebra|melocoton|fresa|membrillo)\b/.test(
+      nombre,
+    )
+  ) {
+    return 0;
+  }
+
+  if (
+    /\bvinos?\b/.test(consultaNormalizada) &&
+    !/\bvinagre\b/.test(consultaNormalizada) &&
+    /\bvinagre\b/.test(nombre)
   ) {
     return 0;
   }

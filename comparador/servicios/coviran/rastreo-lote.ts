@@ -39,11 +39,13 @@ export async function rastrearLoteCoviran({
   resultadosPorConsulta,
   maxProductos,
   permitirVacio = false,
+  incluirCatalogoCompleto = false,
 }: {
   consultas: string[];
   resultadosPorConsulta: number;
   maxProductos: number;
   permitirVacio?: boolean;
+  incluirCatalogoCompleto?: boolean;
 }): Promise<{
   productos: ProductoCoviran[];
   peticionesRealizadas: number;
@@ -65,6 +67,13 @@ export async function rastrearLoteCoviran({
       if (productos.size >= maxProductos) break;
     }
     if (productos.size >= maxProductos) break;
+  }
+
+  if (incluirCatalogoCompleto) {
+    for (const producto of catalogo.productos) {
+      productos.set(producto.identificadorExterno, producto);
+      if (productos.size >= maxProductos) break;
+    }
   }
 
   if (productos.size === 0 && !permitirVacio) {

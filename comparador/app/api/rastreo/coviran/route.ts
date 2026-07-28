@@ -12,6 +12,7 @@ type SolicitudRastreoCoviran = {
   resultadosPorConsulta?: unknown;
   maxProductos?: unknown;
   guardar?: unknown;
+  incluirCatalogoCompleto?: unknown;
 };
 
 export async function POST(request: Request) {
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
     const maxProductos =
       typeof cuerpo.maxProductos === "number" ? cuerpo.maxProductos : 250;
     const guardar = cuerpo.guardar === true;
+    const incluirCatalogoCompleto = cuerpo.incluirCatalogoCompleto === true;
 
     if (consultas.length === 0 || consultas.length > 100) {
       return Response.json(
@@ -76,6 +78,7 @@ export async function POST(request: Request) {
         consultas,
         resultadosPorConsulta,
         maxProductos,
+        incluirCatalogoCompleto,
       });
       const persistencia = guardar
         ? await guardarRastreoCoviran({

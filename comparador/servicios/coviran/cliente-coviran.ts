@@ -364,6 +364,32 @@ function extraerVigencia(texto: string): {
   tituloVigencia: string;
 } {
   const limpio = texto.replace(/\s+/g, " ");
+  const detallada = limpio.match(
+    /Válido del\s+(\d{1,2})\s+de\s+([a-záéíóú]+)\s+al\s+(\d{1,2})\s+de\s+([a-záéíóú]+)\s+de\s+(\d{4})/i,
+  );
+  if (detallada) {
+    const [, diaInicio, nombreMesInicio, diaFin, nombreMesFin, anioFin] =
+      detallada;
+    const mesInicio = MESES[normalizar(nombreMesInicio)];
+    const mesFin = MESES[normalizar(nombreMesFin)];
+    if (!mesInicio || !mesFin) {
+      throw new Error("Covirán publicó un mes de vigencia no reconocido");
+    }
+    const anioInicio =
+      mesInicio > mesFin ? Number(anioFin) - 1 : Number(anioFin);
+    return {
+      fechaInicio:
+        `${anioInicio}-${String(mesInicio).padStart(2, "0")}-` +
+        `${diaInicio.padStart(2, "0")}T00:00:00+02:00`,
+      fechaFin:
+        `${anioFin}-${String(mesFin).padStart(2, "0")}-` +
+        `${diaFin.padStart(2, "0")}T23:59:59+02:00`,
+      tituloVigencia:
+        `válida del ${diaInicio} de ${nombreMesInicio} al ` +
+        `${diaFin} de ${nombreMesFin} de ${anioFin}`,
+    };
+  }
+
   const coincidencia = limpio.match(
     /Válido del\s+(\d{1,2})\s+al\s+(\d{1,2})\s+de\s+([a-záéíóú]+)\s+de\s+(\d{4})/i,
   );

@@ -24,6 +24,7 @@ export const CONSULTAS_RASTREO_HABITUALES = [
   "papel higiénico",
   "detergente",
   "champú",
+  "vino blanco",
 ] as const;
 
 export const CONSULTAS_RASTREO_TEXTO =

@@ -32,10 +32,21 @@ function productoRelevante(producto: ProductoApiDia, consulta: string) {
     .split(" ")
     .filter((palabra) => palabra.length > 1)
     .map(raizPalabra);
-  const tokens = normalizar(
+  const tokensNombre = normalizar(
+    [producto.display_name, producto.brand].filter(Boolean).join(" "),
+  )
+    .split(" ")
+    .map(raizPalabra);
+
+  if (palabras.every((palabra) => tokensNombre.includes(palabra))) return true;
+
+  const consultaNormalizada = normalizar(consulta);
+  if (!["fruta", "frutas", "verdura", "verduras"].includes(consultaNormalizada)) {
+    return false;
+  }
+
+  const tokensCategoria = normalizar(
     [
-      producto.display_name,
-      producto.brand,
       producto.l1_category_description,
       producto.l2_category_description,
     ]
@@ -45,7 +56,7 @@ function productoRelevante(producto: ProductoApiDia, consulta: string) {
     .split(" ")
     .map(raizPalabra);
 
-  return palabras.every((palabra) => tokens.includes(palabra));
+  return palabras.every((palabra) => tokensCategoria.includes(palabra));
 }
 
 function convertirProducto(
