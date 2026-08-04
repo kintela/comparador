@@ -33,6 +33,7 @@ type Producto = {
 
 type RespuestaBusqueda = {
   ok: boolean;
+  terminoResuelto?: string;
   productos?: Producto[];
   solicitudRastreo?: { registrada: boolean } | null;
   error?: string;
@@ -56,6 +57,7 @@ type MejorPrecio = {
 
 type ResultadoArticulo = {
   articuloId: string;
+  terminoResuelto: string;
   precios: Record<string, MejorPrecio>;
   referenciaComparacion: ReferenciaComparacion | null;
   enCola: boolean;
@@ -211,7 +213,7 @@ export function CalculadoraLista() {
         const precio = resultado?.precios[supermercado];
         if (!precio) continue;
         const calculo = calcularCosteArticulo({
-          consulta: articulo.termino,
+          consulta: resultado?.terminoResuelto ?? articulo.termino,
           cantidad: articulo.cantidad,
           precio: precio.precio,
           precioReferencia: precio.precioReferencia,
@@ -317,12 +319,13 @@ export function CalculadoraLista() {
 
           const precios: Record<string, MejorPrecio> = {};
           const productos = datos.productos ?? [];
+          const terminoResuelto = datos.terminoResuelto ?? articulo.termino;
           const candidatos = productos
             .map((producto) => ({
               producto,
               relevancia: puntuacionRelevanciaProducto(
                 producto.nombre,
-                articulo.termino,
+                terminoResuelto,
               ),
             }))
             .filter(
@@ -330,11 +333,11 @@ export function CalculadoraLista() {
                 relevancia > 0 &&
                 esProductoAdecuadoParaLista(
                   producto.nombre,
-                  articulo.termino,
+                  terminoResuelto,
                 ),
             );
           const referenciaComparacion = crearReferenciaComparacionAutomatica(
-            articulo.termino,
+            terminoResuelto,
             candidatos.flatMap(({ producto }) =>
               producto.ofertas.map((oferta) => ({
                 nombreProducto: producto.nombre,
@@ -353,7 +356,7 @@ export function CalculadoraLista() {
               }
               const actual = precios[oferta.supermercado];
               const calculoUnitario = calcularCosteArticulo({
-                consulta: articulo.termino,
+                consulta: terminoResuelto,
                 cantidad: 1,
                 precio: oferta.precio,
                 precioReferencia: oferta.precioReferencia,
@@ -367,7 +370,7 @@ export function CalculadoraLista() {
               const costeUnitario = calculoUnitario.total;
               const calculoActual = actual
                 ? calcularCosteArticulo({
-                    consulta: articulo.termino,
+                    consulta: terminoResuelto,
                     cantidad: 1,
                     precio: actual.precio,
                     precioReferencia: actual.precioReferencia,
@@ -398,6 +401,7 @@ export function CalculadoraLista() {
 
           return {
             articuloId: articulo.id,
+            terminoResuelto,
             precios,
             referenciaComparacion,
             enCola:
@@ -408,6 +412,7 @@ export function CalculadoraLista() {
         } catch (error) {
           return {
             articuloId: articulo.id,
+            terminoResuelto: articulo.termino,
             precios: {},
             referenciaComparacion: null,
             enCola: false,
@@ -763,7 +768,7 @@ function TablaComparacion({
                     <p className="mt-1 text-xs font-medium text-[#71837c]">
                       {articulo.cantidad}{" "}
                       {etiquetaCantidadArticulo(
-                        articulo.termino,
+                        resultado?.terminoResuelto ?? articulo.termino,
                         articulo.cantidad,
                         resultado?.referenciaComparacion,
                       )}
@@ -775,7 +780,7 @@ function TablaComparacion({
                     const precio = resultado?.precios[supermercado];
                     const calculo = precio
                       ? calcularCosteArticulo({
-                          consulta: articulo.termino,
+                          consulta: resultado?.terminoResuelto ?? articulo.termino,
                           cantidad: articulo.cantidad,
                           precio: precio.precio,
                           precioReferencia: precio.precioReferencia,
@@ -825,12 +830,12 @@ function TablaComparacion({
                                 <p className="mt-1 text-xs font-semibold text-[#16805e]">
                                   por {calculo.cantidadComparableTexto}
                                 </p>
-                                <p className="mt-1 text-xs text-[#71837c]">
-                                  Envase: {moneda(precio.precio)}
-                                  {calculo.cantidadEnvaseTexto
-                                    ? ` · ${calculo.cantidadEnvaseTexto}`
-                                    : ""}
-                                </p>
+                                {calculo.cantidadEnvaseTexto && (
+                                  <p className="mt-1 text-xs text-[#71837c]">
+                                    Envase: {moneda(precio.precio)} ·{" "}
+                                    {calculo.cantidadEnvaseTexto}
+                                  </p>
+                                )}
                                 <p className="mt-1 text-xs text-[#71837c]">
                                   {moneda(calculo.precioKg ?? 0)} /{calculo.unidadComparable}
                                 </p>
@@ -857,9 +862,22 @@ function TablaComparacion({
                                 </p>
                               )
                             )}
-                            <p className="mx-auto mt-1 line-clamp-2 max-w-36 text-xs leading-4 text-[#71837c]" title={precio.nombreProducto}>
-                              {precio.nombreProducto}
-                            </p>
+                            <div className="mx-auto mt-2 flex max-w-44 items-center justify-center gap-2">
+                              <p className="line-clamp-2 min-w-0 text-xs leading-4 text-[#71837c]" title={precio.nombreProducto}>
+                                {precio.nombreProducto}
+                              </p>
+                              {precio.urlProducto && (
+                                <a
+                                  href={precio.urlProducto}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  aria-label={`Ver ${precio.nombreProducto} en ${supermercado}`}
+                                  className="grid size-8 shrink-0 place-items-center rounded-lg border border-[#176b50]/25 text-sm font-bold text-[#176b50] transition hover:bg-[#176b50] hover:text-white"
+                                >
+                                  ↗
+                                </a>
+                              )}
+                            </div>
                           </div>
                         ) : (
                           <span className="text-[#a8b2ae]" title="Precio no encontrado">—</span>

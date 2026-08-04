@@ -624,6 +624,7 @@ export async function GET(request: Request) {
     return Response.json({
       ok: true,
       consulta,
+      terminoResuelto: terminoResuelto?.termino ?? consulta,
       soloOfertas,
       supermercados,
       total: productos.length,

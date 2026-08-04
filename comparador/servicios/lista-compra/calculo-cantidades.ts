@@ -59,7 +59,12 @@ export function obtenerPesoMedioPiezaKg(consulta: string): number | null {
 function esPrecioPorKilogramo(unidad: string | null) {
   if (!unidad) return false;
   const normalizada = crearSlug(unidad).replaceAll("-", " ");
-  return normalizada === "kg" || normalizada.includes("kilogram");
+  return (
+    normalizada === "kg" ||
+    normalizada === "kilo" ||
+    normalizada === "kilos" ||
+    normalizada.includes("kilogram")
+  );
 }
 
 function esPrecioPorLitro(unidad: string | null) {
