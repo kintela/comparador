@@ -78,23 +78,45 @@ function comienzaPorPalabrasEquivalentes(nombre: string, variante: string) {
   );
 }
 
+function crearFormasCompuestas(palabras: string[]) {
+  const formas = new Set<string>();
+
+  for (let inicio = 0; inicio < palabras.length; inicio += 1) {
+    let forma = "";
+    for (let fin = inicio; fin < palabras.length; fin += 1) {
+      forma += palabras[fin];
+      formas.add(forma);
+    }
+  }
+
+  return formas;
+}
+
 function contarPalabrasCoincidentes(nombre: string, variante: string) {
-  const palabrasNombre = new Set(
-    nombre
-      .split(" ")
-      .map(singularizarPalabra)
-      .filter((palabra) => !PALABRAS_NO_SIGNIFICATIVAS.has(palabra)),
-  );
-  const palabrasConsulta = [
-    ...new Set(
-      variante
-        .split(" ")
-        .map(singularizarPalabra)
-        .filter((palabra) => !PALABRAS_NO_SIGNIFICATIVAS.has(palabra)),
-    ),
-  ];
-  return palabrasConsulta.filter((palabra) => palabrasNombre.has(palabra))
-    .length;
+  const palabrasNombre = nombre.split(" ").map(singularizarPalabra);
+  const palabrasConsulta = variante.split(" ").map(singularizarPalabra);
+  const formasNombre = crearFormasCompuestas(palabrasNombre);
+  const coincidencias = new Set<string>();
+
+  // Compara también grupos contiguos sin espacios. Así, una marca escrita
+  // como “Elpozo” equivale a “El Pozo” y “Cocacola” a “Coca Cola”, en ambos
+  // sentidos, sin convertir una coincidencia parcial en palabra válida.
+  for (let inicio = 0; inicio < palabrasConsulta.length; inicio += 1) {
+    let forma = "";
+    for (let fin = inicio; fin < palabrasConsulta.length; fin += 1) {
+      forma += palabrasConsulta[fin];
+      if (!formasNombre.has(forma)) continue;
+
+      for (let indice = inicio; indice <= fin; indice += 1) {
+        const palabra = palabrasConsulta[indice];
+        if (!PALABRAS_NO_SIGNIFICATIVAS.has(palabra)) {
+          coincidencias.add(palabra);
+        }
+      }
+    }
+  }
+
+  return coincidencias.size;
 }
 
 export function puntuacionRelevanciaProducto(
