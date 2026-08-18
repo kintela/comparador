@@ -3,7 +3,7 @@ import "server-only";
 import { rastrearProductosCostco } from "./cliente-costco";
 import type { ErrorRastreoCostco, ProductoCostco } from "./tipos-costco";
 
-const PAUSA_ENTRE_BUSQUEDAS_MS = 300;
+const PAUSA_ENTRE_BUSQUEDAS_MS = 800;
 
 function esperar(milisegundos: number) {
   return new Promise((resolve) => setTimeout(resolve, milisegundos));
@@ -29,6 +29,7 @@ export async function rastrearLoteCostco({
   const errores: ErrorRastreoCostco[] = [];
   const productosEncontradosPorConsulta: Record<string, number> = {};
   let peticionesRealizadas = 0;
+  let erroresConsecutivos = 0;
 
   for (const consulta of consultas) {
     if (productos.size >= maxProductos) break;
@@ -43,6 +44,7 @@ export async function rastrearLoteCostco({
           maxProductos - productos.size,
         ),
       });
+      erroresConsecutivos = 0;
       peticionesRealizadas += resultado.peticionesRealizadas;
       productosEncontradosPorConsulta[consulta] = resultado.productos.length;
       for (const producto of resultado.productos) {
@@ -51,11 +53,17 @@ export async function rastrearLoteCostco({
       }
     } catch (error) {
       peticionesRealizadas += 1;
+      erroresConsecutivos += 1;
+      const mensaje =
+        error instanceof Error ? error.message : "Error desconocido";
       errores.push({
         consulta,
         pagina: 1,
-        mensaje: error instanceof Error ? error.message : "Error desconocido",
+        mensaje,
       });
+      if (productos.size === 0 && erroresConsecutivos >= 3 && !permitirVacio) {
+        throw new Error(`Costco bloqueó las peticiones consecutivas. ${mensaje}`);
+      }
     }
   }
 

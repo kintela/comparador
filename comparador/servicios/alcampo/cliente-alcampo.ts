@@ -1,6 +1,8 @@
 import "server-only";
 
 import { crearSlug, obtenerCategoriaSugerida } from "@/servicios/eroski/categorias-eroski";
+import { fetchComoNavegador } from "@/servicios/rastreo/cliente-navegador";
+import { ejecutarConReintentos } from "@/servicios/rastreo/reintentos";
 
 import type {
   EstadoInicialAlcampo,
@@ -138,25 +140,34 @@ export async function rastrearProductosAlcampo({
   peticionesRealizadas: number;
   regionId: string | null;
 }> {
-  const url = new URL("/search", ORIGEN_ALCAMPO);
-  url.searchParams.set("q", consulta);
-  const respuesta = await fetch(url, {
-    cache: "no-store",
-    headers: {
-      Accept: "text/html,application/xhtml+xml",
-      "Accept-Language": "es-ES,es;q=0.9",
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
-        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+  const estado = await ejecutarConReintentos(
+    async (intento) => {
+      const url = new URL("/search", ORIGEN_ALCAMPO);
+      url.searchParams.set("q", consulta);
+      if (intento > 1) url.searchParams.set("_intento", String(intento));
+      const respuesta = await fetchComoNavegador(url, {
+        headers: {
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Language": "es-ES,es;q=0.9",
+          Referer: `${ORIGEN_ALCAMPO}/`,
+          "Sec-Fetch-Dest": "document",
+          "Sec-Fetch-Mode": "navigate",
+          "Sec-Fetch-Site": "same-origin",
+          "Upgrade-Insecure-Requests": "1",
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+            "AppleWebKit/537.36 (KHTML, like Gecko) " +
+            "Chrome/136.0.0.0 Safari/537.36",
+        },
+        redirect: "follow",
+      });
+      if (!respuesta.ok) {
+        throw new Error(`Alcampo respondió con estado ${respuesta.status}`);
+      }
+      return extraerEstadoInicial(await respuesta.text());
     },
-    redirect: "follow",
-    signal: AbortSignal.timeout(25_000),
-  });
-  if (!respuesta.ok) {
-    throw new Error(`Alcampo respondió con estado ${respuesta.status}`);
-  }
-
-  const estado = extraerEstadoInicial(await respuesta.text());
+    { intentos: 3, retrasoInicialMs: 1_500 },
+  );
   const catalogo = estado.data?.search?.catalogue?.data;
   const entidades = estado.data?.products?.productEntities ?? {};
   const idsOrdenados = (catalogo?.productGroups ?? []).flatMap(

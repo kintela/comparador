@@ -17,7 +17,7 @@ export type ResultadoLoteEroski = {
   resultadosPorConsulta: Record<string, number>;
 };
 
-const PAUSA_ENTRE_PETICIONES_MS = 250;
+const PAUSA_ENTRE_PETICIONES_MS = 700;
 
 function esperar(milisegundos: number) {
   return new Promise((resolve) => setTimeout(resolve, milisegundos));
@@ -38,6 +38,7 @@ export async function rastrearLoteEroski({
   const errores: ErrorRastreoEroski[] = [];
   const productosEncontradosPorConsulta: Record<string, number> = {};
   let peticionesRealizadas = 0;
+  let erroresConsecutivos = 0;
 
   bucleConsultas: for (const consulta of consultas) {
     productosEncontradosPorConsulta[consulta] = 0;
@@ -50,6 +51,7 @@ export async function rastrearLoteEroski({
 
       try {
         const resultado = await rastrearProductosEroski(consulta, pagina);
+        erroresConsecutivos = 0;
         peticionesRealizadas += 1;
         productosEncontradosPorConsulta[consulta] += resultado.productos.length;
         const categoriaSugerida = obtenerCategoriaSugerida(consulta);
@@ -65,11 +67,17 @@ export async function rastrearLoteEroski({
         }
       } catch (error) {
         peticionesRealizadas += 1;
+        erroresConsecutivos += 1;
+        const mensaje =
+          error instanceof Error ? error.message : "Error desconocido";
         errores.push({
           consulta,
           pagina,
-          mensaje: error instanceof Error ? error.message : "Error desconocido",
+          mensaje,
         });
+        if (productos.size === 0 && erroresConsecutivos >= 3 && !permitirVacio) {
+          throw new Error(`Eroski bloqueó las peticiones consecutivas. ${mensaje}`);
+        }
       }
     }
   }

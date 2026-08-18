@@ -1,6 +1,7 @@
 import "server-only";
 
 import { obtenerCategoriaSugerida } from "@/servicios/eroski/categorias-eroski";
+import { ejecutarConReintentos } from "@/servicios/rastreo/reintentos";
 
 import type {
   ProductoCostco,
@@ -292,7 +293,7 @@ function convertirProducto(
   };
 }
 
-export async function rastrearProductosCostco({
+async function rastrearProductosCostcoUnaVez({
   consulta,
   limite,
 }: {
@@ -324,4 +325,21 @@ export async function rastrearProductosCostco({
     productos: [...productos.values()].slice(0, limite),
     peticionesRealizadas: 2 + Math.ceil(identificadores.length / 10),
   };
+}
+
+export async function rastrearProductosCostco({
+  consulta,
+  limite,
+}: {
+  consulta: string;
+  limite: number;
+}): Promise<{
+  total: number;
+  productos: ProductoCostco[];
+  peticionesRealizadas: number;
+}> {
+  return ejecutarConReintentos(
+    () => rastrearProductosCostcoUnaVez({ consulta, limite }),
+    { intentos: 3, retrasoInicialMs: 1_000 },
+  );
 }

@@ -4,6 +4,8 @@ import * as cheerio from "cheerio";
 import type { AnyNode } from "domhandler";
 
 import { obtenerCategoriaSugerida } from "@/servicios/eroski/categorias-eroski";
+import { fetchComoNavegador } from "@/servicios/rastreo/cliente-navegador";
+import { ejecutarConReintentos } from "@/servicios/rastreo/reintentos";
 
 import type { ProductoElCorteIngles } from "./tipos-el-corte-ingles";
 
@@ -12,7 +14,7 @@ const CENTRO_ENTREGA_REFERENCIA = "0130";
 const MAX_RESULTADOS_POR_PETICION = 24;
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
-  "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+  "(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
 const MARCADOR_ESTADO = "window.__MOONSHINE_STATE__ = ";
 const FIN_ESTADO =
   "window.__MOONSHINE_STATE__.__fingerprint";
@@ -174,12 +176,11 @@ function convertirProductoEstructurado(
   };
 }
 
-function parsearEstadoEstructurado(
-  html: string,
+function parsearBloquesEstructurados(
+  estado: EstadoElCorteIngles | null,
   consulta: string,
   limite: number,
 ): { total: number; productos: ProductoElCorteIngles[] } | null {
-  const estado = extraerEstado(html);
   if (!estado?.blocks) return null;
 
   const productos = new Map<string, ProductoElCorteIngles>();
@@ -284,8 +285,8 @@ export function parsearResultadosElCorteIngles(
   consulta: string,
   limite: number,
 ): { total: number; productos: ProductoElCorteIngles[] } {
-  const resultadoEstructurado = parsearEstadoEstructurado(
-    html,
+  const resultadoEstructurado = parsearBloquesEstructurados(
+    extraerEstado(html),
     consulta,
     limite,
   );
@@ -384,47 +385,58 @@ export async function rastrearProductosElCorteIngles({
   peticionesRealizadas: number;
   centroEntrega: string;
 }> {
-  // El buscador actual de ECI es común a todas las secciones. Después
-  // conservamos únicamente los resultados cuyo enlace pertenece al supermercado.
-  const url = new URL("/search-nwx/", ORIGEN_EL_CORTE_INGLES);
-  url.searchParams.set("s", consulta);
-  url.searchParams.set("stype", "past_search_multi");
+  return ejecutarConReintentos(
+    async (intento) => {
+      // La página HTML de resultados bloquea con frecuencia las IP de centros de
+      // datos. Su API oficial de VueStore devuelve el mismo estado estructurado.
+      const url = new URL(
+        "/api/firefly/vuestore/new-search/1/",
+        ORIGEN_EL_CORTE_INGLES,
+      );
+      url.searchParams.set("s", consulta);
+      url.searchParams.set("showDimensions", "none");
+      url.searchParams.set("stype", "past_search_multi");
+      url.searchParams.set("isHome", "false");
+      url.searchParams.set("isBookSearch", "false");
+      if (intento > 1) url.searchParams.set("_intento", String(intento));
 
-  const respuesta = await fetch(url, {
-    cache: "no-store",
-    headers: {
-      Accept: "text/html,application/xhtml+xml",
-      "Accept-Language": "es-ES,es;q=0.9",
-      "User-Agent": USER_AGENT,
-      Cookie: `home_delivery_center=${CENTRO_ENTREGA_REFERENCIA}`,
+      const respuesta = await fetchComoNavegador(url, {
+        headers: {
+          Accept: "application/json",
+          "Accept-Language": "es-ES,es;q=0.9",
+          Cookie: `home_delivery_center=${CENTRO_ENTREGA_REFERENCIA}`,
+          Referer: `${ORIGEN_EL_CORTE_INGLES}/supermercado/`,
+          "Sec-Fetch-Dest": "empty",
+          "Sec-Fetch-Mode": "cors",
+          "Sec-Fetch-Site": "same-origin",
+          "Upgrade-Insecure-Requests": "1",
+          "User-Agent": USER_AGENT,
+        },
+        redirect: "follow",
+      });
+      if (!respuesta.ok) {
+        throw new Error(
+          `El Corte Inglés respondió con estado ${respuesta.status}`,
+        );
+      }
+
+      const estado = (await respuesta.json()) as EstadoElCorteIngles;
+      const resultado = parsearBloquesEstructurados(
+        estado,
+        consulta,
+        Math.min(Math.max(1, limite), MAX_RESULTADOS_POR_PETICION),
+      );
+      if (!resultado || resultado.productos.length === 0) {
+        throw new Error(
+          "La API de El Corte Inglés no devolvió productos de supermercado",
+        );
+      }
+      return {
+        ...resultado,
+        peticionesRealizadas: 1,
+        centroEntrega: CENTRO_ENTREGA_REFERENCIA,
+      };
     },
-    redirect: "follow",
-    signal: AbortSignal.timeout(25_000),
-  });
-  if (!respuesta.ok) {
-    throw new Error(`El Corte Inglés respondió con estado ${respuesta.status}`);
-  }
-
-  const html = await respuesta.text();
-  const resultado = parsearResultadosElCorteIngles(
-    html,
-    consulta,
-    Math.min(Math.max(1, limite), MAX_RESULTADOS_POR_PETICION),
+    { intentos: 3, retrasoInicialMs: 2_000 },
   );
-  if (resultado.productos.length === 0) {
-    const $ = cheerio.load(html);
-    const titulo = $("title").text().replace(/\s+/g, " ").trim();
-    const enlacesSupermercado = $('a[href*="/supermercado/"]').length;
-    const enlacesProducto = $('a[href*="/B"], a[href*="/b"]').length;
-    throw new Error(
-      "El Corte Inglés no devolvió productos interpretables " +
-        `(página: ${titulo || "sin título"}; enlaces de supermercado: ` +
-        `${enlacesSupermercado}; enlaces de producto: ${enlacesProducto})`,
-    );
-  }
-  return {
-    ...resultado,
-    peticionesRealizadas: 1,
-    centroEntrega: CENTRO_ENTREGA_REFERENCIA,
-  };
 }

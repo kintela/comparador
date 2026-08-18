@@ -6,7 +6,7 @@ import type {
   ProductoElCorteIngles,
 } from "./tipos-el-corte-ingles";
 
-const PAUSA_ENTRE_BUSQUEDAS_MS = 500;
+const PAUSA_ENTRE_BUSQUEDAS_MS = 1_200;
 
 function esperar(milisegundos: number) {
   return new Promise((resolve) => setTimeout(resolve, milisegundos));
@@ -33,6 +33,7 @@ export async function rastrearLoteElCorteIngles({
   const errores: ErrorRastreoElCorteIngles[] = [];
   const productosEncontradosPorConsulta: Record<string, number> = {};
   let peticionesRealizadas = 0;
+  let erroresConsecutivos = 0;
   let centroEntrega = "0130";
 
   for (const consulta of consultas) {
@@ -45,6 +46,7 @@ export async function rastrearLoteElCorteIngles({
         consulta,
         limite: Math.min(resultadosPorConsulta, maxProductos - productos.size),
       });
+      erroresConsecutivos = 0;
       peticionesRealizadas += resultado.peticionesRealizadas;
       productosEncontradosPorConsulta[consulta] = resultado.productos.length;
       centroEntrega = resultado.centroEntrega;
@@ -54,11 +56,19 @@ export async function rastrearLoteElCorteIngles({
       }
     } catch (error) {
       peticionesRealizadas += 1;
+      erroresConsecutivos += 1;
+      const mensaje =
+        error instanceof Error ? error.message : "Error desconocido";
       errores.push({
         consulta,
         pagina: 1,
-        mensaje: error instanceof Error ? error.message : "Error desconocido",
+        mensaje,
       });
+      if (productos.size === 0 && erroresConsecutivos >= 3 && !permitirVacio) {
+        throw new Error(
+          `El Corte Inglés bloqueó las peticiones consecutivas. ${mensaje}`,
+        );
+      }
     }
   }
 

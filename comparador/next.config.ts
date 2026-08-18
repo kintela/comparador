@@ -1,12 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdfjs-dist", "@napi-rs/canvas"],
+  serverExternalPackages: ["pdfjs-dist", "@napi-rs/canvas", "impit"],
   outputFileTracingIncludes: {
     "/api/cron/rastreo/*": [
       "./node_modules/pdfjs-dist/**/*",
       "./node_modules/@napi-rs/canvas/**/*",
       "./node_modules/@napi-rs/canvas-linux-x64-gnu/**/*",
+      "./node_modules/impit/**/*",
+      "./node_modules/impit-linux-x64-gnu/**/*",
     ],
     "/api/rastreo/coviran": [
       "./node_modules/pdfjs-dist/**/*",

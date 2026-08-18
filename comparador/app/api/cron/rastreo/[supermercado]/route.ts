@@ -74,6 +74,19 @@ type ResultadoFallback = {
   errores: Array<{ consulta: string; mensaje: string }>;
 };
 
+const LIMITE_REFERENCIAS_POR_EJECUCION = 30;
+const TIEMPO_MAXIMO_ANTES_DE_REFERENCIAS_MS = 180_000;
+
+function referenciasOmitidas() {
+  return {
+    reintentadas: 0,
+    actualizadas: 0,
+    desactivadas: 0,
+    peticiones: 0,
+    precios: 0,
+  };
+}
+
 async function completarReferencias<R extends ResultadoFallback>({
   supermercado,
   desde,
@@ -95,10 +108,15 @@ async function completarReferencias<R extends ResultadoFallback>({
   peticiones: number;
   precios: number;
 }> {
-  const referencias = await obtenerReferenciasNoActualizadas({
-    supermercado,
-    desde,
-  });
+  if (
+    Date.now() - new Date(desde).getTime() >=
+    TIEMPO_MAXIMO_ANTES_DE_REFERENCIAS_MS
+  ) {
+    return referenciasOmitidas();
+  }
+  const referencias = (
+    await obtenerReferenciasNoActualizadas({ supermercado, desde })
+  ).slice(0, LIMITE_REFERENCIAS_POR_EJECUCION);
   if (referencias.length === 0) {
     return {
       reintentadas: 0,
@@ -307,7 +325,9 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = await completarReferencias({
+      const extra = resultado.errores.length > 0
+        ? referenciasOmitidas()
+        : await completarReferencias({
         supermercado,
         desde: inicioActualizacion,
         rastrear: (consultasFallback) =>
@@ -324,7 +344,7 @@ async function ejecutarRastreo(
             errores: resultadoFallback.errores,
             tipoRastreo,
           }),
-      });
+          });
       return sumarReferencias(resumen, extra);
     }
     case "bm": {
@@ -345,7 +365,9 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = await completarReferencias({
+      const extra = resultado.errores.length > 0
+        ? referenciasOmitidas()
+        : await completarReferencias({
         supermercado,
         desde: inicioActualizacion,
         rastrear: (consultasFallback) =>
@@ -362,7 +384,7 @@ async function ejecutarRastreo(
             errores: resultadoFallback.errores,
             tipoRastreo,
           }),
-      });
+          });
       return sumarReferencias(resumen, extra);
     }
     case "mercadona": {
@@ -388,7 +410,9 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = await completarReferencias({
+      const extra = resultado.errores.length > 0
+        ? referenciasOmitidas()
+        : await completarReferencias({
         supermercado,
         desde: inicioActualizacion,
         rastrear: (consultasFallback) =>
@@ -407,7 +431,7 @@ async function ejecutarRastreo(
             zona: resultadoFallback.zona,
             tipoRastreo,
           }),
-      });
+          });
       return sumarReferencias(resumen, extra);
     }
     case "aldi": {
@@ -429,7 +453,9 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = await completarReferencias({
+      const extra = resultado.errores.length > 0
+        ? referenciasOmitidas()
+        : await completarReferencias({
         supermercado,
         desde: inicioActualizacion,
         rastrear: (consultasFallback) =>
@@ -446,7 +472,7 @@ async function ejecutarRastreo(
             errores: resultadoFallback.errores,
             tipoRastreo,
           }),
-      });
+          });
       return sumarReferencias(resumen, extra);
     }
     case "dia": {
@@ -548,7 +574,9 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = await completarReferencias({
+      const extra = resultado.errores.length > 0
+        ? referenciasOmitidas()
+        : await completarReferencias({
         supermercado,
         desde: inicioActualizacion,
         rastrear: (consultasFallback) =>
@@ -566,7 +594,7 @@ async function ejecutarRastreo(
             regionId: resultadoFallback.regionId,
             tipoRastreo,
           }),
-      });
+          });
       return sumarReferencias(resumen, extra);
     }
     case "lupa": {
@@ -708,7 +736,9 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = await completarReferencias({
+      const extra = resultado.errores.length > 0
+        ? referenciasOmitidas()
+        : await completarReferencias({
         supermercado,
         desde: inicioActualizacion,
         rastrear: (consultasFallback) =>
@@ -725,7 +755,7 @@ async function ejecutarRastreo(
             errores: resultadoFallback.errores,
             tipoRastreo,
           }),
-      });
+          });
       return sumarReferencias(resumen, extra);
     }
     case "primaprix": {
@@ -789,7 +819,9 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = await completarReferencias({
+      const extra = resultado.errores.length > 0
+        ? referenciasOmitidas()
+        : await completarReferencias({
         supermercado,
         desde: inicioActualizacion,
         rastrear: (consultasFallback) =>
@@ -807,7 +839,7 @@ async function ejecutarRastreo(
             centroEntrega: resultadoFallback.centroEntrega,
             tipoRastreo,
           }),
-      });
+          });
       return sumarReferencias(resumen, extra);
     }
   }
