@@ -43,6 +43,7 @@ type ArticuloLista = {
   id: string;
   termino: string;
   cantidad: number;
+  unidadCantidad: "UD" | "KG";
 };
 
 type MejorPrecio = {
@@ -81,6 +82,12 @@ const SUPERMERCADOS = [
 ] as const;
 
 const CLAVE_LISTA = "comparador-lista-compra-v1";
+const REFERENCIA_UN_KILO: ReferenciaComparacion = {
+  cantidad: 1,
+  unidad: "KG",
+  cantidadBase: 1000,
+  unidadVisual: "g",
+};
 
 function crearId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
@@ -138,6 +145,10 @@ function moneda(valor: number) {
   });
 }
 
+function cantidadTexto(valor: number) {
+  return valor.toLocaleString("es-ES", { maximumFractionDigits: 2 });
+}
+
 function requiereCargaDirecta(url: string) {
   if (
     url.startsWith("/api/imagenes/coviran") ||
@@ -178,6 +189,10 @@ export function CalculadoraLista() {
                     typeof item.termino === "string" &&
                     typeof item.cantidad === "number",
                 )
+                .map((item) => ({
+                  ...item,
+                  unidadCantidad: item.unidadCantidad === "KG" ? "KG" as const : "UD" as const,
+                }))
                 .slice(0, 20),
             );
           }
@@ -265,6 +280,7 @@ export function CalculadoraLista() {
         id: crearId(),
         termino,
         cantidad: 1,
+        unidadCantidad: "UD" as const,
       })),
     ]);
     setEntrada("");
@@ -276,13 +292,41 @@ export function CalculadoraLista() {
     );
   }
 
-  function cambiarCantidad(id: string, cambio: number) {
+  function cambiarCantidad(id: string, direccion: -1 | 1) {
     setArticulos((actuales) =>
       actuales.map((articulo) =>
         articulo.id === id
           ? {
               ...articulo,
-              cantidad: Math.min(20, Math.max(1, articulo.cantidad + cambio)),
+              cantidad: Math.min(
+                articulo.unidadCantidad === "KG" ? 50 : 20,
+                Math.max(
+                  articulo.unidadCantidad === "KG" ? 0.25 : 1,
+                  Math.round(
+                    (articulo.cantidad +
+                      direccion * (articulo.unidadCantidad === "KG" ? 0.25 : 1)) *
+                      100,
+                  ) / 100,
+                ),
+              ),
+            }
+          : articulo,
+      ),
+    );
+    setResultados(null);
+  }
+
+  function cambiarUnidadCantidad(id: string, unidadCantidad: "UD" | "KG") {
+    setArticulos((actuales) =>
+      actuales.map((articulo) =>
+        articulo.id === id
+          ? {
+              ...articulo,
+              unidadCantidad,
+              cantidad:
+                unidadCantidad === "UD"
+                  ? Math.max(1, Math.round(articulo.cantidad))
+                  : articulo.cantidad,
             }
           : articulo,
       ),
@@ -336,16 +380,19 @@ export function CalculadoraLista() {
                   terminoResuelto,
                 ),
             );
-          const referenciaComparacion = crearReferenciaComparacionAutomatica(
-            terminoResuelto,
-            candidatos.flatMap(({ producto }) =>
-              producto.ofertas.map((oferta) => ({
-                nombreProducto: producto.nombre,
-                precioReferencia: oferta.precioReferencia,
-                unidadReferencia: oferta.unidadReferencia,
-              })),
-            ),
-          );
+          const referenciaComparacion =
+            articulo.unidadCantidad === "KG"
+              ? REFERENCIA_UN_KILO
+              : crearReferenciaComparacionAutomatica(
+                  terminoResuelto,
+                  candidatos.flatMap(({ producto }) =>
+                    producto.ofertas.map((oferta) => ({
+                      nombreProducto: producto.nombre,
+                      precioReferencia: oferta.precioReferencia,
+                      unidadReferencia: oferta.unidadReferencia,
+                    })),
+                  ),
+                );
 
           for (const { producto, relevancia } of candidatos) {
             for (const oferta of producto.ofertas) {
@@ -488,7 +535,7 @@ export function CalculadoraLista() {
           <div>
             <h2 className="text-xl font-bold">Productos de la lista</h2>
             <p className="mt-1 text-sm text-[#71837c]">
-              Ajusta las unidades antes de calcular.
+              Ajusta la cantidad y elige si la necesitas por unidades o por kilos.
             </p>
           </div>
           {articulos.length > 0 && (
@@ -523,7 +570,11 @@ export function CalculadoraLista() {
                   <p className="truncate font-bold" title={articulo.termino}>
                     {articulo.termino}
                   </p>
-                  {obtenerPesoMedioPiezaKg(articulo.termino) !== null && (
+                  {articulo.unidadCantidad === "KG" ? (
+                    <p className="mt-0.5 text-xs text-[#71837c]">
+                      Cantidad solicitada por peso
+                    </p>
+                  ) : obtenerPesoMedioPiezaKg(articulo.termino) !== null && (
                     <p className="mt-0.5 text-xs text-[#71837c]">
                       Por piezas · ≈{" "}
                       {Math.round(
@@ -543,7 +594,7 @@ export function CalculadoraLista() {
                     −
                   </button>
                   <span className="min-w-7 text-center text-sm font-extrabold">
-                    {articulo.cantidad}
+                    {cantidadTexto(articulo.cantidad)}
                   </span>
                   <button
                     type="button"
@@ -554,6 +605,20 @@ export function CalculadoraLista() {
                     +
                   </button>
                 </div>
+                <select
+                  value={articulo.unidadCantidad}
+                  onChange={(evento) =>
+                    cambiarUnidadCantidad(
+                      articulo.id,
+                      evento.target.value === "KG" ? "KG" : "UD",
+                    )
+                  }
+                  aria-label={`Unidad de cantidad de ${articulo.termino}`}
+                  className="h-8 rounded-lg border border-[#17352b]/10 bg-white px-2 text-sm font-bold text-[#17352b] outline-none focus:border-[#176b50]"
+                >
+                  <option value="UD">ud.</option>
+                  <option value="KG">kg</option>
+                </select>
                 <button
                   type="button"
                   onClick={() => {
@@ -766,11 +831,12 @@ function TablaComparacion({
                   <th className="sticky left-0 z-10 border-r border-[#17352b]/10 bg-white px-5 py-4 align-top">
                     <p className="font-bold">{articulo.termino}</p>
                     <p className="mt-1 text-xs font-medium text-[#71837c]">
-                      {articulo.cantidad}{" "}
+                      {cantidadTexto(articulo.cantidad)}{" "}
                       {etiquetaCantidadArticulo(
                         resultado?.terminoResuelto ?? articulo.termino,
                         articulo.cantidad,
                         resultado?.referenciaComparacion,
+                        articulo.unidadCantidad,
                       )}
                     </p>
                     {resultado?.enCola && <p className="mt-2 text-xs font-semibold text-[#a56600]">Añadido a la cola de rastreo</p>}
