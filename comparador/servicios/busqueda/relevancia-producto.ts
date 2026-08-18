@@ -198,6 +198,17 @@ export function puntuacionRelevanciaProducto(
     return 0;
   }
 
+  if (
+    variantes.some((variante) =>
+      variante.split(" ").map(singularizarPalabra).includes("huevo"),
+    ) &&
+    /\b(tortilla|mayonesa|salsa|pasta|flan|natillas|bizcocho|galleta|galletas|rebozado|ensaladilla|revuelto|preparado)\b/.test(
+      nombre,
+    )
+  ) {
+    return 0;
+  }
+
   const consultaNormalizada = normalizar(consulta);
   if (
     ["melon", "melones"].includes(consultaNormalizada) &&
