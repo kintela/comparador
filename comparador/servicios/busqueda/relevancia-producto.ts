@@ -166,7 +166,7 @@ export function puntuacionRelevanciaProducto(
         nombre,
       );
     if (
-      /\b(golosina|gominola|caramelo|bebida|refresco|yogur|yogurt|postre|gelatina|mermelada|sorbete|helado|stick|vaso|lata|conserva|almibar|gajos|ambientador|jabon|gel|champu|vodka|licor|potito|tarrito|galleta|chocolate|dulce|agua|colonia|spray|smoothie|preparado|flan|natillas|soja)\b/.test(
+      /\b(golosina|gominola|caramelo|bebida|refresco|yogur|yogurt|postre|gelatina|mermelada|sorbete|helado|stick|vaso|lata|conserva|almibar|gajos|ambientador|jabon|gel|champu|vodka|licor|potito|tarrito|papilla|papillas|galleta|chocolate|dulce|agua|colonia|spray|smoothie|preparado|flan|natillas|soja)\b/.test(
         nombre,
       )
     ) {
