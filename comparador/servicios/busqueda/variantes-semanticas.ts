@@ -17,8 +17,8 @@ const VARIANTES_POR_TERMINO: Record<string, string[]> = {
   clementinas: ["mandarina", "mandarinas"],
   "tomate ensalada": ["tomate rama"],
   "tomate rama": ["tomate ensalada"],
-  "huevos camperos": ["huevos camperas", "huevos gallinas camperas"],
-  "huevos camperas": ["huevos camperos", "huevos gallinas camperas"],
+  "huevos camperos": ["huevos camperas"],
+  "huevos camperas": ["huevos camperos"],
 };
 
 function singularizar(termino: string) {
