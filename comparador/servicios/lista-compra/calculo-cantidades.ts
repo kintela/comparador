@@ -73,6 +73,15 @@ function esPrecioPorLitro(unidad: string | null) {
   return normalizada === "l" || normalizada.includes("litro");
 }
 
+function nombreIndicaPrecioPorKilogramo(nombreProducto: string | undefined) {
+  if (!nombreProducto) return false;
+  const nombre = crearSlug(nombreProducto).replaceAll("-", " ");
+  return (
+    /\b(al peso|a granel|por kilo)\b/.test(nombre) ||
+    /\b(kilo|kg)\b(?:\s+elaboracion\s+propia)?$/.test(nombre)
+  );
+}
+
 function pesoEnvaseKg(nombreProducto: string | undefined): {
   pesoKg: number;
   texto: string;
@@ -132,6 +141,7 @@ function unidadesEnvase(nombreProducto: string | undefined): {
 function dimensionProducto(producto: ProductoMedible) {
   if (esPrecioPorKilogramo(producto.unidadReferencia)) return "KG" as const;
   if (esPrecioPorLitro(producto.unidadReferencia)) return "L" as const;
+  if (nombreIndicaPrecioPorKilogramo(producto.nombreProducto)) return "KG" as const;
   if (pesoEnvaseKg(producto.nombreProducto)) return "KG" as const;
   if (volumenEnvaseL(producto.nombreProducto)) return "L" as const;
   if (unidadesEnvase(producto.nombreProducto)) return "UD" as const;
@@ -267,6 +277,8 @@ export function calcularCosteArticulo({
     precioUnidadComparable =
       precioReferencia !== null && esPrecioPorKilogramo(unidadReferencia)
         ? precioReferencia
+        : nombreIndicaPrecioPorKilogramo(nombreProducto)
+          ? precio
         : pesoEnvase
           ? precio / pesoEnvase.pesoKg
           : null;
@@ -303,9 +315,7 @@ export function calcularCosteArticulo({
   }
 
   const pesoMedioPiezaKg = obtenerPesoMedioPiezaKg(consulta);
-  const ventaAlPeso = /\b(al peso|a granel|kilo)\b/.test(
-    crearSlug(nombreProducto ?? "").replaceAll("-", " "),
-  );
+  const ventaAlPeso = nombreIndicaPrecioPorKilogramo(nombreProducto);
   const precioKg =
     pesoMedioPiezaKg !== null &&
     ((precioReferencia !== null && esPrecioPorKilogramo(unidadReferencia)) ||
