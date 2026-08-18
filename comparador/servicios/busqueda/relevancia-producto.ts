@@ -225,6 +225,17 @@ export function puntuacionRelevanciaProducto(
   }
 
   if (
+    variantes.some((variante) =>
+      variante.split(" ").map(singularizarPalabra).includes("queso"),
+    ) &&
+    !/\bfresc(?:o|a|os|as)\b/.test(consultaNormalizada) &&
+    /\bqueso\b/.test(nombre) &&
+    /\bfresc(?:o|a|os|as)\b/.test(nombre)
+  ) {
+    return 0;
+  }
+
+  if (
     ["melon", "melones"].includes(consultaNormalizada) &&
     /\b(sandias?|golosina|gominola|caramelo|chicle|bolsa|semilla|semillas)\b/.test(
       nombre,
