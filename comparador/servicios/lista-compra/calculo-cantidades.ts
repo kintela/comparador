@@ -122,20 +122,35 @@ function pesoEnvaseKg(nombreProducto: string | undefined): {
     : null;
 }
 
-function unidadesEnvase(nombreProducto: string | undefined): {
+function unidadesEnvase(
+  nombreProducto: string | undefined,
+  unidadReferencia?: string | null,
+): {
   unidades: number;
   texto: string;
 } | null {
-  if (!nombreProducto) return null;
-  const nombre = nombreProducto.toLocaleLowerCase("es");
+  const nombre = nombreProducto?.toLocaleLowerCase("es") ?? "";
   const coincidencia = nombre.match(
     /(?:pack\s*(?:de)?\s*|(?:lote|caja)\s*(?:de)?\s*)?(\d+)\s*(unidades?|uds?\.?|rollos?|capsulas?|lavados?|dosis|sobres?|botellas?|latas?|briks?|paquetes?)\b/i,
   );
-  if (!coincidencia) return null;
-  const unidades = Number(coincidencia[1]);
-  return Number.isFinite(unidades) && unidades > 0
-    ? { unidades, texto: `${unidades} ud.` }
-    : null;
+  if (coincidencia) {
+    const unidades = Number(coincidencia[1]);
+    return Number.isFinite(unidades) && unidades > 0
+      ? { unidades, texto: `${unidades} ud.` }
+      : null;
+  }
+
+  if (/\b(?:1\s*\/\s*2|media)\s+docena\b/i.test(nombre)) {
+    return { unidades: 6, texto: "6 ud." };
+  }
+  if (/\bdecena\b/i.test(nombre)) return { unidades: 10, texto: "10 ud." };
+  if (/\bdocena\b/i.test(nombre)) return { unidades: 12, texto: "12 ud." };
+
+  const referencia = crearSlug(unidadReferencia ?? "").replaceAll("-", " ");
+  if (referencia.includes("docena") || referencia.includes("dozen")) {
+    return { unidades: 12, texto: "12 ud." };
+  }
+  return null;
 }
 
 function dimensionProducto(producto: ProductoMedible) {
@@ -144,7 +159,9 @@ function dimensionProducto(producto: ProductoMedible) {
   if (nombreIndicaPrecioPorKilogramo(producto.nombreProducto)) return "KG" as const;
   if (pesoEnvaseKg(producto.nombreProducto)) return "KG" as const;
   if (volumenEnvaseL(producto.nombreProducto)) return "L" as const;
-  if (unidadesEnvase(producto.nombreProducto)) return "UD" as const;
+  if (unidadesEnvase(producto.nombreProducto, producto.unidadReferencia)) {
+    return "UD" as const;
+  }
   return null;
 }
 
@@ -271,7 +288,7 @@ export function calcularCosteArticulo({
   const comparable = referenciaComparacion ?? null;
   const pesoEnvase = pesoEnvaseKg(nombreProducto);
   const volumenEnvase = volumenEnvaseL(nombreProducto);
-  const unidades = unidadesEnvase(nombreProducto);
+  const unidades = unidadesEnvase(nombreProducto, unidadReferencia);
   let precioUnidadComparable: number | null = null;
   if (comparable?.unidad === "KG") {
     const precioCalculadoPorPeso = pesoEnvase
