@@ -790,18 +790,18 @@ function TablaComparacion({
 
       <div
         ref={contenedorTabla}
-        className="scrollbar-tabla overflow-x-scroll overscroll-x-contain"
+        className="scrollbar-tabla max-h-[70vh] overflow-auto overscroll-contain"
         tabIndex={0}
-        aria-label="Tabla comparativa desplazable horizontalmente"
+        aria-label="Tabla comparativa desplazable horizontal y verticalmente"
       >
         <table className="w-max min-w-full border-collapse text-left">
           <thead>
             <tr className="bg-[#f7f5ee]">
-              <th className="sticky left-0 z-20 min-w-56 border-b border-r border-[#17352b]/10 bg-[#f7f5ee] px-5 py-4 text-sm font-bold">
+              <th className="sticky left-0 top-0 z-40 min-w-56 border-b border-r border-[#17352b]/10 bg-[#f7f5ee] px-5 py-4 text-sm font-bold shadow-[0_1px_0_rgba(23,53,43,0.1)]">
                 Producto
               </th>
               {visibles.map((supermercado) => (
-                <th key={supermercado} className="min-w-40 border-b border-[#17352b]/10 px-4 py-4 text-center text-sm font-bold">
+                <th key={supermercado} className="sticky top-0 z-30 min-w-40 border-b border-[#17352b]/10 bg-[#f7f5ee] px-4 py-4 text-center text-sm font-bold shadow-[0_1px_0_rgba(23,53,43,0.1)]">
                   <div className="flex items-center justify-center gap-2">
                     <span>{supermercado}</span>
                     <button
@@ -957,14 +957,14 @@ function TablaComparacion({
           </tbody>
           <tfoot>
             <tr className="bg-[#17352b] text-white">
-              <th className="sticky left-0 z-20 border-r border-white/10 bg-[#17352b] px-5 py-5">
+              <th className="sticky bottom-0 left-0 z-40 border-r border-t border-white/10 bg-[#17352b] px-5 py-5 shadow-[0_-1px_0_rgba(255,255,255,0.12)]">
                 <p className="text-lg font-extrabold">Total</p>
                 <p className="mt-1 text-xs font-medium text-white/60">Solo se comparan cestas completas</p>
               </th>
               {totalesVisibles.map((total) => {
                 const ganadora = total.completa && total.total === totalMasBarato;
                 return (
-                  <td key={total.supermercado} className={`px-4 py-5 text-center ${ganadora ? "bg-[#176b50]" : ""}`}>
+                  <td key={total.supermercado} className={`sticky bottom-0 z-30 border-t border-white/10 px-4 py-5 text-center shadow-[0_-1px_0_rgba(255,255,255,0.12)] ${ganadora ? "bg-[#176b50]" : "bg-[#17352b]"}`}>
                     {total.encontrados > 0 ? (
                       <>
                         {ganadora && <span className="mb-2 inline-block rounded-full bg-[#f4c95d] px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#17352b]">Más barato</span>}

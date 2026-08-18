@@ -26,6 +26,7 @@ body {
 
 .scrollbar-tabla::-webkit-scrollbar {
   height: 14px;
+  width: 14px;
 }
 
 .scrollbar-tabla::-webkit-scrollbar-track {
