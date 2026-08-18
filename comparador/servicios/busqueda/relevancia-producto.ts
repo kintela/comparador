@@ -45,13 +45,16 @@ function variantesConsulta(consulta: string) {
 }
 
 function singularizarPalabra(palabra: string) {
+  let singular = palabra;
   if (palabra.length > 4 && palabra.endsWith("es")) {
-    return palabra.slice(0, -2);
+    singular = palabra.slice(0, -2);
   }
-  if (palabra.length > 3 && palabra.endsWith("s")) {
-    return palabra.slice(0, -1);
+  else if (palabra.length > 3 && palabra.endsWith("s")) {
+    singular = palabra.slice(0, -1);
   }
-  return palabra;
+  return singular === "campero" || singular === "campera"
+    ? "camper"
+    : singular;
 }
 
 function contienePalabrasCompletas(nombre: string, variante: string) {

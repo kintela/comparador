@@ -23,9 +23,10 @@ function normalizar(texto: string) {
 }
 
 function raizPalabra(palabra: string) {
-  if (palabra.length > 4 && palabra.endsWith("es")) return palabra.slice(0, -2);
-  if (palabra.length > 3 && palabra.endsWith("s")) return palabra.slice(0, -1);
-  return palabra;
+  let raiz = palabra;
+  if (palabra.length > 4 && palabra.endsWith("es")) raiz = palabra.slice(0, -2);
+  else if (palabra.length > 3 && palabra.endsWith("s")) raiz = palabra.slice(0, -1);
+  return raiz === "campero" || raiz === "campera" ? "camper" : raiz;
 }
 
 function productoRelevante(producto: ProductoApiAlcampo, consulta: string) {
