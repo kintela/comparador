@@ -23,7 +23,7 @@ export type ErrorRastreoLidl = {
   mensaje: string;
 };
 
-type PrecioLidl = {
+export type PrecioLidl = {
   basePrice?: { text?: string };
   discount?: {
     bargainHintText?: string;
@@ -37,7 +37,7 @@ type PrecioLidl = {
   endDate?: string;
 };
 
-type PrecioLidlPlus = {
+export type PrecioLidlPlus = {
   lidlPlusText?: string;
   price?: PrecioLidl;
 };
@@ -63,7 +63,15 @@ export type ProductoApiLidl = {
     string,
     {
       regionName?: string;
+      regionPriceId?: string;
       status?: string;
+    }
+  >;
+  regionsPrices?: Record<
+    string,
+    {
+      currentPrice?: PrecioLidl;
+      currentLidlPlusPrice?: PrecioLidlPlus;
     }
   >;
   stockAvailability?: {

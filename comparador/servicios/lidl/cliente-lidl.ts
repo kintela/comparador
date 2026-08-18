@@ -1,5 +1,6 @@
 import "server-only";
 
+import { obtenerVariantesSemanticas } from "@/servicios/busqueda/variantes-semanticas";
 import { obtenerCategoriaSugerida } from "@/servicios/eroski/categorias-eroski";
 
 import type {
@@ -12,10 +13,16 @@ const ORIGEN_LIDL = "https://www.lidl.es";
 const ENDPOINT_BUSQUEDA = `${ORIGEN_LIDL}/q/api/search`;
 const REGION_VIZCAYA = "16";
 const RESULTADOS_POR_PAGINA = 48;
-const MAX_PAGINAS_POR_BUSQUEDA = 1;
+const MAX_PAGINAS_POR_BUSQUEDA = 2;
 const CATEGORIAS_ESTRICTAS: Record<string, string[]> = {
   aceite: ["aceites y grasas"],
+  clementina: ["frutas"],
+  clementinas: ["frutas"],
   detergente: ["detergentes y cuidado de la ropa"],
+  mandarina: ["frutas"],
+  mandarinas: ["frutas"],
+  sandia: ["frutas"],
+  "uva blanca": ["frutas"],
 };
 const PALABRAS_ALTERNATIVAS: Record<string, string[]> = {
   detergente: [
@@ -49,12 +56,12 @@ function raizPalabra(palabra: string) {
 }
 
 function productoRelevante(producto: ProductoApiLidl, consulta: string) {
-  if (producto.category !== "Food") return false;
+  if (!["Food", "F+V"].includes(producto.category ?? "")) return false;
   const consultaNormalizada = normalizar(consulta);
-  const palabras = consultaNormalizada
-    .split(" ")
-    .filter((palabra) => palabra.length > 1)
-    .map(raizPalabra);
+  const consultas = [
+    consultaNormalizada,
+    ...obtenerVariantesSemanticas(consultaNormalizada).map(normalizar),
+  ];
   const tokens = normalizar(
     [
       producto.title,
@@ -66,13 +73,22 @@ function productoRelevante(producto: ProductoApiLidl, consulta: string) {
   )
     .split(" ")
     .map(raizPalabra);
-  const coincideNombre = palabras.every((palabra) => tokens.includes(palabra));
+  const coincideNombre = consultas.some((variante) =>
+    variante
+      .split(" ")
+      .filter((palabra) => palabra.length > 1)
+      .map(raizPalabra)
+      .every((palabra) => tokens.includes(palabra)),
+  );
 
   const categorias = CATEGORIAS_ESTRICTAS[consultaNormalizada];
   if (!categorias) return coincideNombre;
 
-  const coincideCategoria = categorias.some((categoria) =>
-    normalizar(producto.keyfacts?.wonCategoryPrimary ?? "").includes(categoria),
+  const categoriaProducto = normalizar(
+    producto.keyfacts?.wonCategoryPrimary?.split("/").at(-1) ?? "",
+  );
+  const coincideCategoria = categorias.some(
+    (categoria) => categoriaProducto === normalizar(categoria),
   );
   if (!coincideCategoria) return false;
   if (coincideNombre) return true;
@@ -104,6 +120,35 @@ function extraerPrecioReferencia(texto: string | undefined) {
   };
 }
 
+function extraerReferenciaDesdeEnvase(
+  texto: string | undefined,
+  precio: number,
+) {
+  if (!texto) return { precio: null, unidad: null };
+  const normalizado = normalizar(texto);
+  if (/\b(a granel|al peso)\b/.test(normalizado)) {
+    return { precio, unidad: "KG" };
+  }
+
+  const coincidencia = texto.match(/(\d+(?:[.,]\d+)?)\s*(kg|g|l|ml|cl)\b/i);
+  if (!coincidencia) return { precio: null, unidad: null };
+  const cantidad = Number(coincidencia[1].replace(",", "."));
+  if (!numeroFinito(cantidad)) return { precio: null, unidad: null };
+
+  const unidadEnvase = coincidencia[2].toLocaleLowerCase("es");
+  const cantidadBase =
+    unidadEnvase === "g" || unidadEnvase === "ml"
+      ? cantidad / 1000
+      : unidadEnvase === "cl"
+        ? cantidad / 100
+        : cantidad;
+  const unidad = unidadEnvase === "kg" || unidadEnvase === "g" ? "KG" : "L";
+  return {
+    precio: Math.round((precio / cantidadBase) * 100) / 100,
+    unidad,
+  };
+}
+
 function convertirProducto(
   producto: ProductoApiLidl,
   consulta: string,
@@ -113,14 +158,25 @@ function convertirProducto(
   const region = producto.regionsV2?.[REGION_VIZCAYA];
   if (!identificador || !nombre || region?.status !== "ONLINE") return null;
 
-  const precioNormal = producto.price?.price;
-  const precioClub = producto.lidlPlus
-    ?.map((oferta) => oferta.price?.price)
-    .find(numeroFinito);
+  const preciosRegion = producto.regionsPrices?.[region.regionPriceId ?? "1"];
+  const datosPrecioNormal = numeroFinito(producto.price?.price)
+    ? producto.price
+    : preciosRegion?.currentPrice;
+  const ofertasClub = [
+    ...(producto.lidlPlus ?? []),
+    ...(preciosRegion?.currentLidlPlusPrice
+      ? [preciosRegion.currentLidlPlusPrice]
+      : []),
+  ];
+  const precioNormal = datosPrecioNormal?.price;
+  const ofertaClub = ofertasClub.find((oferta) =>
+    numeroFinito(oferta.price?.price),
+  );
+  const precioClub = ofertaClub?.price?.price;
   const precioActual = numeroFinito(precioNormal) ? precioNormal : precioClub;
   if (!numeroFinito(precioActual)) return null;
 
-  const precioAnterior = producto.price?.oldPrice;
+  const precioAnterior = datosPrecioNormal?.oldPrice;
   const descuentoGeneral =
     numeroFinito(precioAnterior) && precioAnterior > precioActual;
   const descuentoClub =
@@ -137,18 +193,25 @@ function convertirProducto(
     : descuentoGeneral
       ? precioAnterior
       : precioActual;
-  const ofertaClub = producto.lidlPlus?.find((oferta) =>
-    numeroFinito(oferta.price?.price),
-  );
-  const porcentaje = producto.price?.discount?.percentageDiscount;
+  const porcentaje = datosPrecioNormal?.discount?.percentageDiscount;
   const textosPromocion = [
     ofertaClub?.lidlPlusText,
     descuentoGeneral && porcentaje ? `${porcentaje}% de descuento` : null,
-    descuentoGeneral ? producto.price?.discount?.bargainHintText : null,
+    descuentoGeneral ? datosPrecioNormal?.discount?.bargainHintText : null,
   ].filter(Boolean);
-  const referencia = extraerPrecioReferencia(
-    ofertaClub?.price?.basePrice?.text ?? producto.price?.basePrice?.text,
+  const datosPrecioActual = descuentoClub ? ofertaClub?.price : datosPrecioNormal;
+  const referenciaExplicita = extraerPrecioReferencia(
+    datosPrecioActual?.basePrice?.text,
   );
+  const referencia =
+    referenciaExplicita.precio !== null
+      ? referenciaExplicita
+      : extraerReferenciaDesdeEnvase(
+          datosPrecioActual?.packaging?.text ??
+            ofertaClub?.price?.packaging?.text ??
+            datosPrecioNormal?.packaging?.text,
+          descuentoClub && numeroFinito(precioClub) ? precioClub : precioActual,
+        );
   const categoriaOriginal =
     producto.keyfacts?.wonCategoryPrimary?.split("/").at(-1)?.trim() ?? null;
   const marca =
@@ -172,11 +235,11 @@ function convertirProducto(
     textoPromocion: textosPromocion.join(" · ") || null,
     fechaInicioPromocion:
       precioPromocional !== null
-        ? (ofertaClub?.price?.startDate ?? producto.price?.startDate ?? null)
+        ? (ofertaClub?.price?.startDate ?? datosPrecioNormal?.startDate ?? null)
         : null,
     fechaFinPromocion:
       precioPromocional !== null
-        ? (ofertaClub?.price?.endDate ?? producto.price?.endDate ?? null)
+        ? (ofertaClub?.price?.endDate ?? datosPrecioNormal?.endDate ?? null)
         : null,
     disponible: producto.stockAvailability?.availabilityIndicator !== 2,
     urlProducto: producto.canonicalUrl
