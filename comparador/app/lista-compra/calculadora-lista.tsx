@@ -680,11 +680,17 @@ function TablaComparacion({
   const [supermercadosVisibles, setSupermercadosVisibles] = useState<string[]>([
     ...SUPERMERCADOS,
   ]);
+  const [soloCestasCompletas, setSoloCestasCompletas] = useState(false);
   const ordenOriginal = new Map<string, number>(
     SUPERMERCADOS.map((supermercado, indice) => [supermercado, indice]),
   );
+  const numeroCestasCompletas = totales.filter((total) => total.completa).length;
   const totalesVisibles = totales
-    .filter((total) => supermercadosVisibles.includes(total.supermercado))
+    .filter(
+      (total) =>
+        supermercadosVisibles.includes(total.supermercado) &&
+        (!soloCestasCompletas || total.completa),
+    )
     .sort((a, b) => {
       if (a.completa !== b.completa) return a.completa ? -1 : 1;
       if (a.completa && b.completa) return a.total - b.total;
@@ -753,22 +759,45 @@ function TablaComparacion({
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-b border-[#17352b]/10 bg-[#f7f5ee]/70 px-5 py-3 sm:px-7">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#17352b]/10 bg-[#f7f5ee]/70 px-5 py-3 sm:px-7">
         <div>
           <p className="text-xs font-semibold text-[#60766e]">
             Desplázate horizontalmente para ver todos los supermercados
           </p>
-          {visibles.length < SUPERMERCADOS.length && (
+          {supermercadosVisibles.length < SUPERMERCADOS.length && (
             <button
               type="button"
               onClick={() => setSupermercadosVisibles([...SUPERMERCADOS])}
               className="mt-1 text-xs font-bold text-[#176b50] hover:underline"
             >
-              Mostrar todos ({SUPERMERCADOS.length - visibles.length} ocultos)
+              Mostrar todos ({SUPERMERCADOS.length - supermercadosVisibles.length} ocultos)
             </button>
           )}
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setSoloCestasCompletas((actual) => !actual)}
+            disabled={numeroCestasCompletas === 0}
+            aria-pressed={soloCestasCompletas}
+            className={`inline-flex min-h-9 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+              soloCestasCompletas
+                ? "border-[#176b50] bg-[#176b50] text-white"
+                : "border-[#17352b]/15 bg-white text-[#17352b] hover:border-[#176b50]/40 hover:bg-[#e7f5ee]"
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className={`grid size-4 place-items-center rounded border text-[10px] ${
+                soloCestasCompletas
+                  ? "border-white/60 bg-white text-[#176b50]"
+                  : "border-[#17352b]/25"
+              }`}
+            >
+              {soloCestasCompletas ? "✓" : ""}
+            </span>
+            Solo listas completas ({numeroCestasCompletas})
+          </button>
           <button
             type="button"
             onClick={() => desplazarTabla(-1)}
