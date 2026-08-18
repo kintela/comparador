@@ -1,5 +1,7 @@
 import "server-only";
 
+import { puntuacionRelevanciaProducto } from "@/servicios/busqueda/relevancia-producto";
+
 import { obtenerCategoriaSugerida } from "./categorias-eroski";
 import { rastrearProductosEroski } from "./cliente-eroski";
 import type { ProductoEroski } from "./tipos-eroski";
@@ -57,6 +59,11 @@ export async function rastrearLoteEroski({
         const categoriaSugerida = obtenerCategoriaSugerida(consulta);
 
         for (const producto of resultado.productos) {
+          if (
+            puntuacionRelevanciaProducto(producto.nombreOriginal, consulta) <= 0
+          ) {
+            continue;
+          }
           if (!productos.has(producto.identificadorExterno)) {
             productos.set(producto.identificadorExterno, {
               ...producto,

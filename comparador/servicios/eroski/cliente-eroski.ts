@@ -10,6 +10,14 @@ const ORIGEN_EROSKI = "https://supermercado.eroski.es";
 const ORIGEN_PETICIONES_EROSKI =
   "https://eroski.eroski-gcp.global.worldline-solutions.com";
 const TAMANO_MAXIMO_HTML = 5_000_000;
+const RUTAS_CATEGORIA_POR_CONSULTA: Record<string, string> = {
+  "huevo campero":
+    "/es/supermercado/2059698-frescos/2059760-huevos/2059766-huevos-camperos-y-ecologicos/",
+  "huevos camperas":
+    "/es/supermercado/2059698-frescos/2059760-huevos/2059766-huevos-camperos-y-ecologicos/",
+  "huevos camperos":
+    "/es/supermercado/2059698-frescos/2059760-huevos/2059766-huevos-camperos-y-ecologicos/",
+};
 let inicioSesionEroski: Promise<void> | null = null;
 
 function iniciarSesionEroski() {
@@ -33,12 +41,20 @@ function normalizarConsultaEroski(consulta: string) {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+function claveConsultaEroski(consulta: string) {
+  return normalizarConsultaEroski(consulta)
+    .toLocaleLowerCase("es")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 export function construirUrlBusquedaEroski(
   consulta: string,
   pagina = 0,
 ): string {
-  const url = new URL("/es/search/results/", ORIGEN_EROSKI);
-  url.searchParams.set("q", normalizarConsultaEroski(consulta));
+  const rutaCategoria = RUTAS_CATEGORIA_POR_CONSULTA[claveConsultaEroski(consulta)];
+  const url = new URL(rutaCategoria ?? "/es/search/results/", ORIGEN_EROSKI);
+  if (!rutaCategoria) url.searchParams.set("q", normalizarConsultaEroski(consulta));
   if (pagina > 0) url.searchParams.set("pageNumber", pagina.toString());
   return url.toString();
 }
