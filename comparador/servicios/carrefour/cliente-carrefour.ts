@@ -46,8 +46,16 @@ function convertirProducto(
   const precioLista = numeroPositivo(producto.list_price);
   const rebajado = precioLista !== null && precioLista > precioActual;
   const factor = numeroPositivo(producto.unit_conversion_factor);
+  const pesoMedioGramos = numeroPositivo(producto.average_weight);
+  const unidad = unidadReferencia(producto);
+  const cantidadReferencia =
+    unidad === "KG" && producto.variable_weight && pesoMedioGramos !== null
+      ? pesoMedioGramos / 1000
+      : factor;
   const precioReferencia =
-    factor !== null ? Number((precioActual / factor).toFixed(2)) : null;
+    cantidadReferencia !== null
+      ? Number((precioActual / cantidadReferencia).toFixed(2))
+      : null;
   const ruta =
     producto.url_for_play_service ?? producto.urls?.food ?? "/supermercado/";
   const ean = producto.ean13?.trim() || null;
@@ -65,7 +73,7 @@ function convertirProducto(
     precio: rebajado ? precioLista : precioActual,
     precioPromocional: rebajado ? precioActual : null,
     precioReferencia,
-    unidadReferencia: unidadReferencia(producto),
+    unidadReferencia: unidad,
     textoPromocion: rebajado ? "Oferta Carrefour" : null,
     fechaInicioPromocion: null,
     fechaFinPromocion: null,

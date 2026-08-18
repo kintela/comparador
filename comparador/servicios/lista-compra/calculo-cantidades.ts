@@ -274,13 +274,26 @@ export function calcularCosteArticulo({
   const unidades = unidadesEnvase(nombreProducto);
   let precioUnidadComparable: number | null = null;
   if (comparable?.unidad === "KG") {
-    precioUnidadComparable =
+    const precioCalculadoPorPeso = pesoEnvase
+      ? precio / pesoEnvase.pesoKg
+      : null;
+    const referenciaKg =
       precioReferencia !== null && esPrecioPorKilogramo(unidadReferencia)
         ? precioReferencia
+        : null;
+    const referenciaKgValida =
+      referenciaKg !== null &&
+      (precioCalculadoPorPeso === null ||
+        referenciaKg <= precioCalculadoPorPeso * 10)
+        ? referenciaKg
+        : null;
+    precioUnidadComparable =
+      referenciaKgValida !== null
+        ? referenciaKgValida
         : nombreIndicaPrecioPorKilogramo(nombreProducto)
           ? precio
-        : pesoEnvase
-          ? precio / pesoEnvase.pesoKg
+        : precioCalculadoPorPeso !== null
+          ? precioCalculadoPorPeso
           : null;
   } else if (comparable?.unidad === "L") {
     if (precioReferencia !== null && esPrecioPorLitro(unidadReferencia)) {

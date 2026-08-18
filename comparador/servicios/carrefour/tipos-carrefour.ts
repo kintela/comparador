@@ -31,6 +31,8 @@ export type ProductoApiCarrefour = {
   active_price?: number;
   list_price?: number;
   unit_conversion_factor?: number;
+  average_weight?: number;
+  variable_weight?: boolean;
   measure_unit?: string;
   unit_short_name?: string;
   sale_point_available?: boolean;
