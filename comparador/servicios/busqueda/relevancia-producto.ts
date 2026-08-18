@@ -127,6 +127,7 @@ export function puntuacionRelevanciaProducto(
   consulta: string,
 ) {
   const nombre = normalizar(nombreProducto);
+  const consultaNormalizada = normalizar(consulta);
   let mejor = 0;
   let comienzaPorConsulta = false;
   const variantes = variantesConsulta(consulta);
@@ -212,7 +213,17 @@ export function puntuacionRelevanciaProducto(
     return 0;
   }
 
-  const consultaNormalizada = normalizar(consulta);
+  if (
+    variantes.some((variante) =>
+      variante.split(" ").map(singularizarPalabra).includes("queso"),
+    ) &&
+    !/\b(crema|untar|untable)\b/.test(consultaNormalizada) &&
+    /\bqueso\b/.test(nombre) &&
+    /\b(crema|untar|untable)\b/.test(nombre)
+  ) {
+    return 0;
+  }
+
   if (
     ["melon", "melones"].includes(consultaNormalizada) &&
     /\b(sandias?|golosina|gominola|caramelo|chicle|bolsa|semilla|semillas)\b/.test(
