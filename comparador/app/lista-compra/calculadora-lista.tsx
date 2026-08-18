@@ -826,6 +826,29 @@ function TablaComparacion({
           <tbody>
             {articulos.map((articulo) => {
               const resultado = resultados.find((item) => item.articuloId === articulo.id);
+              const calculosFila = new Map<
+                string,
+                ReturnType<typeof calcularCosteArticulo>
+              >();
+              for (const supermercado of visibles) {
+                const precio = resultado?.precios[supermercado];
+                if (!precio) continue;
+                calculosFila.set(
+                  supermercado,
+                  calcularCosteArticulo({
+                    consulta: resultado?.terminoResuelto ?? articulo.termino,
+                    cantidad: articulo.cantidad,
+                    precio: precio.precio,
+                    precioReferencia: precio.precioReferencia,
+                    unidadReferencia: precio.unidadReferencia,
+                    nombreProducto: precio.nombreProducto,
+                    referenciaComparacion: resultado?.referenciaComparacion,
+                  }),
+                );
+              }
+              const costeMasBaratoFila = Math.min(
+                ...[...calculosFila.values()].map((calculo) => calculo.total),
+              );
               return (
                 <tr key={articulo.id} className="border-b border-[#17352b]/8 last:border-b-0">
                   <th className="sticky left-0 z-10 border-r border-[#17352b]/10 bg-white px-5 py-4 align-top">
@@ -844,22 +867,26 @@ function TablaComparacion({
                   </th>
                   {visibles.map((supermercado) => {
                     const precio = resultado?.precios[supermercado];
-                    const calculo = precio
-                      ? calcularCosteArticulo({
-                          consulta: resultado?.terminoResuelto ?? articulo.termino,
-                          cantidad: articulo.cantidad,
-                          precio: precio.precio,
-                          precioReferencia: precio.precioReferencia,
-                          unidadReferencia: precio.unidadReferencia,
-                          nombreProducto: precio.nombreProducto,
-                          referenciaComparacion:
-                            resultado?.referenciaComparacion,
-                        })
-                      : null;
+                    const calculo = calculosFila.get(supermercado) ?? null;
+                    const masBarato =
+                      calculo !== null &&
+                      Math.abs(calculo.total - costeMasBaratoFila) < 0.005;
                     return (
-                      <td key={supermercado} className="px-4 py-4 text-center align-top">
+                      <td
+                        key={supermercado}
+                        className={`px-4 py-4 text-center align-top transition-colors ${
+                          masBarato
+                            ? "bg-[#fff9df] shadow-[inset_0_0_0_2px_#f4c95d]"
+                            : ""
+                        }`}
+                      >
                         {precio ? (
                           <div>
+                            {masBarato && (
+                              <span className="mb-3 inline-flex rounded-full bg-[#f4c95d] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#17352b]">
+                                Más barato
+                              </span>
+                            )}
                             {precio.imagenProducto && (
                               <a
                                 href={precio.urlProducto ?? precio.imagenProducto}
