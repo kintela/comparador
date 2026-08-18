@@ -162,7 +162,9 @@ export function puntuacionRelevanciaProducto(
 
   if (obtenerCategoriaSugerida(consulta) === "Frutas") {
     const formatoFrutaFresca =
-      /\b(al peso|a granel|pieza|malla|bandeja|kg|kilo|kilos)\b/.test(nombre);
+      /\b(al peso|a granel|pieza|malla|bandeja|kg|kilo|kilos|g|gr|gramo|gramos)\b/.test(
+        nombre,
+      );
     if (
       /\b(golosina|gominola|caramelo|bebida|refresco|yogur|yogurt|postre|gelatina|mermelada|sorbete|helado|stick|vaso|lata|conserva|almibar|gajos|ambientador|jabon|gel|champu|vodka|licor|potito|tarrito|galleta|chocolate|dulce|agua|colonia|spray|smoothie|preparado|flan|natillas|soja)\b/.test(
         nombre,
@@ -176,7 +178,11 @@ export function puntuacionRelevanciaProducto(
     // “Naranja para zumo malla” es fruta fresca; “zumo de naranja” no.
     if (/\bzumo\b/.test(nombre) && !formatoFrutaFresca) return 0;
     if (!comienzaPorConsulta && !formatoFrutaFresca) return 0;
-    if (/\b(al peso|a granel|pieza|malla|bandeja)\b/.test(nombre)) {
+    if (
+      /\b(al peso|a granel|pieza|malla|bandeja|kg|kilo|kilos|g|gr|gramo|gramos)\b/.test(
+        nombre,
+      )
+    ) {
       mejor += 150;
     }
   }

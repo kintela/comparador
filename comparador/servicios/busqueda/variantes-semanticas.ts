@@ -11,6 +11,10 @@ const VARIANTES_POR_TERMINO: Record<string, string[]> = {
   "gel de ducha": ["gel de baño"],
   "gel de baño": ["gel de ducha"],
   gula: ["angula", "angulas"],
+  mandarina: ["clementina", "clementinas"],
+  mandarinas: ["clementina", "clementinas"],
+  clementina: ["mandarina", "mandarinas"],
+  clementinas: ["mandarina", "mandarinas"],
 };
 
 function singularizar(termino: string) {

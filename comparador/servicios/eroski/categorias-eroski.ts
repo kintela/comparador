@@ -19,6 +19,7 @@ const CATEGORIAS_POR_BUSQUEDA: Record<string, string> = {
   verduras: "Verduras y hortalizas",
   fruta: "Frutas",
   mandarina: "Frutas",
+  clementina: "Frutas",
   naranja: "Frutas",
   manzana: "Frutas",
   pera: "Frutas",
