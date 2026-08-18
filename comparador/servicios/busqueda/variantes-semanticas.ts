@@ -22,6 +22,13 @@ const VARIANTES_POR_TERMINO: Record<string, string[]> = {
   "huevos camperas": ["huevo campero", "huevos camperos"],
 };
 
+const VARIANTES_POR_PALABRA: Record<string, string[]> = {
+  mandarina: ["clementina", "clementinas"],
+  mandarinas: ["clementina", "clementinas"],
+  clementina: ["mandarina", "mandarinas"],
+  clementinas: ["mandarina", "mandarinas"],
+};
+
 function singularizar(termino: string) {
   if (termino.length > 4 && termino.endsWith("es")) {
     return termino.slice(0, -2);
@@ -34,7 +41,23 @@ function singularizar(termino: string) {
 
 export function obtenerVariantesSemanticas(termino: string): string[] {
   const normalizado = termino.trim().toLocaleLowerCase("es");
-  return VARIANTES_POR_TERMINO[normalizado] ??
-    VARIANTES_POR_TERMINO[singularizar(normalizado)] ??
-    [];
+  const variantes = new Set(
+    VARIANTES_POR_TERMINO[normalizado] ??
+      VARIANTES_POR_TERMINO[singularizar(normalizado)] ??
+      [],
+  );
+  const palabras = normalizado.split(/\s+/).filter(Boolean);
+  palabras.forEach((palabra, indice) => {
+    for (const alternativa of VARIANTES_POR_PALABRA[palabra] ?? []) {
+      variantes.add(
+        palabras
+          .map((actual, posicion) =>
+            posicion === indice ? alternativa : actual,
+          )
+          .join(" "),
+      );
+    }
+  });
+  variantes.delete(normalizado);
+  return [...variantes];
 }
