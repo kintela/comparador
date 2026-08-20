@@ -600,27 +600,10 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = resultado.errores.length > 0
-        ? referenciasOmitidas()
-        : await completarReferencias({
-        supermercado,
-        desde: inicioActualizacion,
-        rastrear: (consultasFallback) =>
-          rastrearLoteAlcampo({
-            consultas: consultasFallback,
-            resultadosPorConsulta,
-            maxProductos: consultasFallback.length * resultadosPorConsulta,
-            permitirVacio: true,
-          }),
-        persistir: (productos, resultadoFallback, consultasFallback) =>
-          guardarRastreoAlcampo({
-            productos,
-            consultas: consultasFallback,
-            errores: resultadoFallback.errores,
-            regionId: resultadoFallback.regionId,
-            tipoRastreo,
-          }),
-          });
+      // El endpoint de Alcampo bloquea la sesión después de unas pocas
+      // búsquedas. Las referencias pendientes entran en la rotación diaria y
+      // no deben provocar aquí un segundo lote de hasta treinta peticiones.
+      const extra = referenciasOmitidas();
       return sumarReferencias(resumen, extra);
     }
     case "lupa": {
