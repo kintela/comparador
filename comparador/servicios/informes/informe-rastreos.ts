@@ -50,6 +50,41 @@ type FilaInforme = {
   mensaje: string | null;
 };
 
+const VENTANA_MISMO_RASTREO_MS = 5 * 60 * 1000;
+
+function agruparUltimoRastreo(ejecuciones: EjecucionDb[]): EjecucionDb[] {
+  const ordenadas = [...ejecuciones].sort(
+    (a, b) =>
+      new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime(),
+  );
+  if (ordenadas.length === 0) return [];
+  const grupo = [ordenadas[0]];
+  for (let indice = 1; indice < ordenadas.length; indice += 1) {
+    const posterior = new Date(ordenadas[indice - 1].fecha_inicio).getTime();
+    const anterior = new Date(ordenadas[indice].fecha_inicio).getTime();
+    if (posterior - anterior > VENTANA_MISMO_RASTREO_MS) break;
+    grupo.push(ordenadas[indice]);
+  }
+  return grupo;
+}
+
+function estadoAgrupado(ejecuciones: EjecucionDb[]): string {
+  if (ejecuciones.some((ejecucion) => ejecucion.estado === "error")) {
+    return "error";
+  }
+  if (ejecuciones.some((ejecucion) => ejecucion.estado === "en_proceso")) {
+    return "en_proceso";
+  }
+  if (
+    ejecuciones.some(
+      (ejecucion) => ejecucion.estado === "completado_con_errores",
+    )
+  ) {
+    return "completado_con_errores";
+  }
+  return "completado";
+}
+
 function escaparHtml(valor: string): string {
   return valor.replace(
     /[&<>"']/g,
@@ -197,15 +232,20 @@ export async function crearYEnviarInformeRastreos(): Promise<{
   if (error) throw new Error(`No se pudieron consultar los rastreos: ${error.message}`);
 
   const ejecuciones = (data ?? []) as unknown as EjecucionDb[];
-  const ultimaPorCadena = new Map<string, EjecucionDb>();
+  const ejecucionesPorCadena = new Map<string, EjecucionDb[]>();
   for (const ejecucion of ejecuciones) {
     const slug = ejecucion.cadenas_supermercados?.slug;
-    if (slug && !ultimaPorCadena.has(slug)) ultimaPorCadena.set(slug, ejecucion);
+    if (!slug) continue;
+    const acumuladas = ejecucionesPorCadena.get(slug) ?? [];
+    acumuladas.push(ejecucion);
+    ejecucionesPorCadena.set(slug, acumuladas);
   }
 
   const filas: FilaInforme[] = SUPERMERCADOS.map((supermercado) => {
-    const ejecucion = ultimaPorCadena.get(supermercado.slug);
-    if (!ejecucion) {
+    const grupo = agruparUltimoRastreo(
+      ejecucionesPorCadena.get(supermercado.slug) ?? [],
+    );
+    if (grupo.length === 0) {
       return {
         supermercado: supermercado.nombre,
         estado: "sin_ejecucion",
@@ -219,26 +259,61 @@ export async function crearYEnviarInformeRastreos(): Promise<{
       };
     }
 
-    const duracionSegundos = ejecucion.fecha_fin
+    const inicioGrupo = grupo.reduce((menor, ejecucion) =>
+      new Date(ejecucion.fecha_inicio) < new Date(menor.fecha_inicio)
+        ? ejecucion
+        : menor,
+    );
+    const finGrupo = grupo
+      .filter((ejecucion) => ejecucion.fecha_fin)
+      .reduce<EjecucionDb | null>(
+        (mayor, ejecucion) =>
+          !mayor ||
+          new Date(ejecucion.fecha_fin ?? 0) > new Date(mayor.fecha_fin ?? 0)
+            ? ejecucion
+            : mayor,
+        null,
+      );
+    const duracionSegundos = finGrupo?.fecha_fin
       ? Math.max(
           0,
           Math.round(
-            (new Date(ejecucion.fecha_fin).getTime() -
-              new Date(ejecucion.fecha_inicio).getTime()) /
+            (new Date(finGrupo.fecha_fin).getTime() -
+              new Date(inicioGrupo.fecha_inicio).getTime()) /
               1000,
           ),
         )
       : null;
+    const mensajes = [
+      ...new Set(
+        grupo
+          .map((ejecucion) => ejecucion.mensaje_error?.trim())
+          .filter((mensaje): mensaje is string => Boolean(mensaje)),
+      ),
+    ];
     return {
-      supermercado: ejecucion.cadenas_supermercados?.nombre ?? supermercado.nombre,
-      estado: ejecucion.estado,
-      inicio: ejecucion.fecha_inicio,
+      supermercado:
+        inicioGrupo.cadenas_supermercados?.nombre ?? supermercado.nombre,
+      estado: estadoAgrupado(grupo),
+      inicio: inicioGrupo.fecha_inicio,
       duracionSegundos,
-      productos: ejecucion.productos_detectados ?? 0,
-      productosNuevos: ejecucion.productos_nuevos ?? 0,
-      precios: ejecucion.precios_insertados ?? 0,
-      errores: ejecucion.errores_detectados ?? 0,
-      mensaje: ejecucion.mensaje_error,
+      productos: grupo.reduce(
+        (total, ejecucion) => total + (ejecucion.productos_detectados ?? 0),
+        0,
+      ),
+      productosNuevos: grupo.reduce(
+        (total, ejecucion) => total + (ejecucion.productos_nuevos ?? 0),
+        0,
+      ),
+      precios: grupo.reduce(
+        (total, ejecucion) => total + (ejecucion.precios_insertados ?? 0),
+        0,
+      ),
+      errores: grupo.reduce(
+        (total, ejecucion) => total + (ejecucion.errores_detectados ?? 0),
+        0,
+      ),
+      mensaje: mensajes.length > 0 ? mensajes.join(" · ") : null,
     };
   });
 

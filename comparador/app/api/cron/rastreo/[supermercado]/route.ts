@@ -5,6 +5,7 @@ import {
 } from "@/servicios/rastreo/bloqueo";
 import { CONFIGURACION_RASTREO_AUTOMATICO } from "@/servicios/rastreo/configuracion";
 import { esRespuestaSinResultados } from "@/servicios/rastreo/errores";
+import { registrarFalloRastreoAutomatico } from "@/servicios/rastreo/fallo-automatico";
 import {
   desactivarReferenciasNoEncontradas,
   obtenerReferenciasNoActualizadas,
@@ -76,6 +77,7 @@ type ResultadoFallback = {
 
 const LIMITE_REFERENCIAS_POR_EJECUCION = 30;
 const TIEMPO_MAXIMO_ANTES_DE_REFERENCIAS_MS = 180_000;
+const LIMITE_CONSULTAS_ALCAMPO = 6;
 
 function referenciasOmitidas() {
   return {
@@ -175,7 +177,17 @@ async function completarReferencias<R extends ResultadoFallback>({
         precios: 0,
       };
     }
-    const persistencia = await persistir(productos, resultado, consultas);
+    const resultadoPersistencia = {
+      ...resultado,
+      errores: resultado.errores.filter(
+        (error) => !esRespuestaSinResultados(error.mensaje),
+      ),
+    } as R;
+    const persistencia = await persistir(
+      productos,
+      resultadoPersistencia,
+      consultas,
+    );
     return {
       reintentadas: referencias.length,
       actualizadas: productos.length,
@@ -227,6 +239,16 @@ function combinarConsultas(
     }
   }
   return [...consultas.values()];
+}
+
+function seleccionarConsultasAlcampo(consultas: string[], fecha = new Date()) {
+  if (consultas.length <= LIMITE_CONSULTAS_ALCAMPO) return consultas;
+  const dia = Math.floor(fecha.getTime() / 86_400_000);
+  const inicio = (dia * LIMITE_CONSULTAS_ALCAMPO) % consultas.length;
+  return Array.from(
+    { length: LIMITE_CONSULTAS_ALCAMPO },
+    (_, indice) => consultas[(inicio + indice) % consultas.length],
+  );
 }
 
 async function guardarResultadosSolicitudes(
@@ -283,7 +305,11 @@ async function ejecutarRastreo(
     obtenerSolicitudesAutomaticas(supermercado),
     obtenerTerminosRastreo(supermercado),
   ]);
-  const consultas = combinarConsultas(solicitudes, terminos);
+  const consultasCompletas = combinarConsultas(solicitudes, terminos);
+  const consultas =
+    supermercado === "alcampo"
+      ? seleccionarConsultasAlcampo(consultasCompletas)
+      : consultasCompletas;
   if (consultas.length === 0) {
     throw new Error(
       `No hay términos de rastreo activos para ${supermercado}`,
@@ -870,6 +896,7 @@ export async function GET(
     });
   }
 
+  const inicioPeticion = new Date().toISOString();
   try {
     const resumen = await ejecutarRastreo(supermercado);
     return Response.json({
@@ -882,6 +909,18 @@ export async function GET(
     const mensaje =
       error instanceof Error ? error.message : "Error desconocido en el cron";
     console.error(`Error en el cron de ${supermercado}:`, mensaje);
+    await registrarFalloRastreoAutomatico(
+      supermercado,
+      mensaje,
+      inicioPeticion,
+    ).catch(
+      (errorRegistro) => {
+        console.error(
+          `No se pudo registrar el fallo automático de ${supermercado}:`,
+          errorRegistro,
+        );
+      },
+    );
     return Response.json(
       { ok: false, supermercado, error: mensaje },
       { status: 502 },

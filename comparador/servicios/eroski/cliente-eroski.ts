@@ -9,6 +9,10 @@ import type { ResultadoRastreoEroski } from "./tipos-eroski";
 const ORIGEN_EROSKI = "https://supermercado.eroski.es";
 const ORIGEN_PETICIONES_EROSKI =
   "https://eroski.eroski-gcp.global.worldline-solutions.com";
+const ORIGENES_PETICIONES_EROSKI = [
+  ORIGEN_EROSKI,
+  ORIGEN_PETICIONES_EROSKI,
+] as const;
 const TAMANO_MAXIMO_HTML = 5_000_000;
 const RUTAS_CATEGORIA_POR_CONSULTA: Record<string, string> = {
   "huevo campero":
@@ -18,20 +22,47 @@ const RUTAS_CATEGORIA_POR_CONSULTA: Record<string, string> = {
   "huevos camperos":
     "/es/supermercado/2059698-frescos/2059760-huevos/2059766-huevos-camperos-y-ecologicos/",
 };
-let inicioSesionEroski: Promise<void> | null = null;
+let origenActivoEroski: string | null = null;
+let origenDescartadoEroski: string | null = null;
+let inicioSesionEroski: Promise<string> | null = null;
 
 function iniciarSesionEroski() {
-  inicioSesionEroski ??= fetchComoNavegador(`${ORIGEN_PETICIONES_EROSKI}/es/`, {
-    headers: {
-      Accept: "text/html,application/xhtml+xml",
-      "Accept-Language": "es-ES,es;q=0.9",
-    },
-  }).then((respuesta) => {
-    if (!respuesta.ok) {
-      inicioSesionEroski = null;
-      throw new Error(`Eroski respondió con estado ${respuesta.status}`);
+  inicioSesionEroski ??= (async () => {
+    let ultimoEstado = 0;
+    const origenes = origenActivoEroski
+      ? [
+          origenActivoEroski,
+          ...ORIGENES_PETICIONES_EROSKI.filter(
+            (origen) => origen !== origenActivoEroski,
+          ),
+        ]
+      : [
+          ...ORIGENES_PETICIONES_EROSKI.filter(
+            (origen) => origen !== origenDescartadoEroski,
+          ),
+          ...ORIGENES_PETICIONES_EROSKI.filter(
+            (origen) => origen === origenDescartadoEroski,
+          ),
+        ];
+
+    for (const origen of origenes) {
+      const respuesta = await fetchComoNavegador(`${origen}/es/`, {
+        headers: {
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Language": "es-ES,es;q=0.9",
+        },
+      });
+      ultimoEstado = respuesta.status;
+      if (respuesta.ok) {
+        origenActivoEroski = origen;
+        origenDescartadoEroski = null;
+        return origen;
+      }
     }
-  });
+
+    inicioSesionEroski = null;
+    throw new Error(`Eroski respondió con estado ${ultimoEstado}`);
+  })();
   return inicioSesionEroski;
 }
 
@@ -65,20 +96,25 @@ export async function rastrearProductosEroski(
 ): Promise<ResultadoRastreoEroski> {
   return ejecutarConReintentos(
     async (intento) => {
-      await iniciarSesionEroski();
+      const origenPeticiones = await iniciarSesionEroski();
       const urlOrigen = construirUrlBusquedaEroski(consulta, pagina);
       const urlPeticion = new URL(urlOrigen);
-      urlPeticion.hostname = new URL(ORIGEN_PETICIONES_EROSKI).hostname;
+      urlPeticion.hostname = new URL(origenPeticiones).hostname;
       if (intento > 1) urlPeticion.searchParams.set("_intento", String(intento));
       const respuesta = await fetchComoNavegador(urlPeticion, {
         headers: {
           Accept: "text/html,application/xhtml+xml",
           "Accept-Language": "es-ES,es;q=0.9",
-          Referer: `${ORIGEN_PETICIONES_EROSKI}/es/`,
+          Referer: `${origenPeticiones}/es/`,
         },
       });
 
       if (!respuesta.ok) {
+        if (respuesta.status === 403) {
+          origenDescartadoEroski = origenPeticiones;
+          origenActivoEroski = null;
+          inicioSesionEroski = null;
+        }
         throw new Error(`Eroski respondió con estado ${respuesta.status}`);
       }
 
