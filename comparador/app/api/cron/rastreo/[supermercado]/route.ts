@@ -5,6 +5,7 @@ import {
 } from "@/servicios/rastreo/bloqueo";
 import { CONFIGURACION_RASTREO_AUTOMATICO } from "@/servicios/rastreo/configuracion";
 import { esRespuestaSinResultados } from "@/servicios/rastreo/errores";
+import { registrarFalloRastreoAutomatico } from "@/servicios/rastreo/fallo-automatico";
 import {
   desactivarReferenciasNoEncontradas,
   obtenerReferenciasNoActualizadas,
@@ -41,11 +42,15 @@ function esSupermercado(valor: string): valor is SupermercadoRastreo {
   return SUPERMERCADOS_RASTREO.includes(valor as SupermercadoRastreo);
 }
 
+function filtrarErroresReales<T extends { mensaje: string }>(errores: T[]) {
+  return errores.filter((error) => !esRespuestaSinResultados(error.mensaje));
+}
+
 function crearResumen(
   resultado: {
     productos: unknown[];
     peticionesRealizadas: number;
-    errores: unknown[];
+    errores: Array<{ mensaje: string }>;
   },
   persistencia: { ejecucionId: string; preciosInsertados: number },
   solicitudesProcesadas: number,
@@ -53,7 +58,7 @@ function crearResumen(
   return {
     productosDetectados: resultado.productos.length,
     peticionesRealizadas: resultado.peticionesRealizadas,
-    erroresDetectados: resultado.errores.length,
+    erroresDetectados: filtrarErroresReales(resultado.errores).length,
     ejecucionId: persistencia.ejecucionId,
     preciosInsertados: persistencia.preciosInsertados,
     solicitudesProcesadas,
@@ -76,6 +81,7 @@ type ResultadoFallback = {
 
 const LIMITE_REFERENCIAS_POR_EJECUCION = 30;
 const TIEMPO_MAXIMO_ANTES_DE_REFERENCIAS_MS = 180_000;
+const LIMITE_CONSULTAS_ALCAMPO = 6;
 
 function referenciasOmitidas() {
   return {
@@ -175,7 +181,15 @@ async function completarReferencias<R extends ResultadoFallback>({
         precios: 0,
       };
     }
-    const persistencia = await persistir(productos, resultado, consultas);
+    const resultadoPersistencia = {
+      ...resultado,
+      errores: filtrarErroresReales(resultado.errores),
+    } as R;
+    const persistencia = await persistir(
+      productos,
+      resultadoPersistencia,
+      consultas,
+    );
     return {
       reintentadas: referencias.length,
       actualizadas: productos.length,
@@ -227,6 +241,16 @@ function combinarConsultas(
     }
   }
   return [...consultas.values()];
+}
+
+function seleccionarConsultasAlcampo(consultas: string[], fecha = new Date()) {
+  if (consultas.length <= LIMITE_CONSULTAS_ALCAMPO) return consultas;
+  const dia = Math.floor(fecha.getTime() / 86_400_000);
+  const inicio = (dia * LIMITE_CONSULTAS_ALCAMPO) % consultas.length;
+  return Array.from(
+    { length: LIMITE_CONSULTAS_ALCAMPO },
+    (_, indice) => consultas[(inicio + indice) % consultas.length],
+  );
 }
 
 async function guardarResultadosSolicitudes(
@@ -283,7 +307,11 @@ async function ejecutarRastreo(
     obtenerSolicitudesAutomaticas(supermercado),
     obtenerTerminosRastreo(supermercado),
   ]);
-  const consultas = combinarConsultas(solicitudes, terminos);
+  const consultasCompletas = combinarConsultas(solicitudes, terminos);
+  const consultas =
+    supermercado === "alcampo"
+      ? seleccionarConsultasAlcampo(consultasCompletas)
+      : consultasCompletas;
   if (consultas.length === 0) {
     throw new Error(
       `No hay términos de rastreo activos para ${supermercado}`,
@@ -316,7 +344,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoEroski({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -325,7 +353,7 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = resultado.errores.length > 0
+      const extra = filtrarErroresReales(resultado.errores).length > 0
         ? referenciasOmitidas()
         : await completarReferencias({
         supermercado,
@@ -356,7 +384,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoBm({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -365,7 +393,7 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = resultado.errores.length > 0
+      const extra = filtrarErroresReales(resultado.errores).length > 0
         ? referenciasOmitidas()
         : await completarReferencias({
         supermercado,
@@ -400,7 +428,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoMercadona({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         zona: resultado.zona,
         tipoRastreo,
       });
@@ -410,7 +438,7 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = resultado.errores.length > 0
+      const extra = filtrarErroresReales(resultado.errores).length > 0
         ? referenciasOmitidas()
         : await completarReferencias({
         supermercado,
@@ -444,7 +472,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoAldi({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -453,7 +481,7 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = resultado.errores.length > 0
+      const extra = filtrarErroresReales(resultado.errores).length > 0
         ? referenciasOmitidas()
         : await completarReferencias({
         supermercado,
@@ -484,7 +512,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoDia({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         codigoPostal: resultado.codigoPostal,
         tipoRastreo,
       });
@@ -525,7 +553,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoLidl({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -564,7 +592,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoAlcampo({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         regionId: resultado.regionId,
         tipoRastreo,
       });
@@ -574,27 +602,10 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = resultado.errores.length > 0
-        ? referenciasOmitidas()
-        : await completarReferencias({
-        supermercado,
-        desde: inicioActualizacion,
-        rastrear: (consultasFallback) =>
-          rastrearLoteAlcampo({
-            consultas: consultasFallback,
-            resultadosPorConsulta,
-            maxProductos: consultasFallback.length * resultadosPorConsulta,
-            permitirVacio: true,
-          }),
-        persistir: (productos, resultadoFallback, consultasFallback) =>
-          guardarRastreoAlcampo({
-            productos,
-            consultas: consultasFallback,
-            errores: resultadoFallback.errores,
-            regionId: resultadoFallback.regionId,
-            tipoRastreo,
-          }),
-          });
+      // El endpoint de Alcampo bloquea la sesión después de unas pocas
+      // búsquedas. Las referencias pendientes entran en la rotación diaria y
+      // no deben provocar aquí un segundo lote de hasta treinta peticiones.
+      const extra = referenciasOmitidas();
       return sumarReferencias(resumen, extra);
     }
     case "lupa": {
@@ -607,7 +618,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoLupa({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -649,7 +660,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoCoviran({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -688,7 +699,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoCarrefour({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -727,7 +738,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoCostco({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -736,7 +747,7 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = resultado.errores.length > 0
+      const extra = filtrarErroresReales(resultado.errores).length > 0
         ? referenciasOmitidas()
         : await completarReferencias({
         supermercado,
@@ -768,7 +779,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoPrimaprix({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -809,7 +820,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoElCorteIngles({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         centroEntrega: resultado.centroEntrega,
         tipoRastreo,
       });
@@ -819,7 +830,7 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = resultado.errores.length > 0
+      const extra = filtrarErroresReales(resultado.errores).length > 0
         ? referenciasOmitidas()
         : await completarReferencias({
         supermercado,
@@ -870,6 +881,7 @@ export async function GET(
     });
   }
 
+  const inicioPeticion = new Date().toISOString();
   try {
     const resumen = await ejecutarRastreo(supermercado);
     return Response.json({
@@ -882,6 +894,18 @@ export async function GET(
     const mensaje =
       error instanceof Error ? error.message : "Error desconocido en el cron";
     console.error(`Error en el cron de ${supermercado}:`, mensaje);
+    await registrarFalloRastreoAutomatico(
+      supermercado,
+      mensaje,
+      inicioPeticion,
+    ).catch(
+      (errorRegistro) => {
+        console.error(
+          `No se pudo registrar el fallo automático de ${supermercado}:`,
+          errorRegistro,
+        );
+      },
+    );
     return Response.json(
       { ok: false, supermercado, error: mensaje },
       { status: 502 },

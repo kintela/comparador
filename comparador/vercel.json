@@ -3,10 +3,6 @@
   "regions": ["fra1"],
   "crons": [
     {
-      "path": "/api/cron/rastreo/eroski",
-      "schedule": "0 3 * * *"
-    },
-    {
       "path": "/api/cron/rastreo/bm",
       "schedule": "15 3 * * *"
     },

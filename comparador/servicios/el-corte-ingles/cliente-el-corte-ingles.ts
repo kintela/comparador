@@ -96,6 +96,20 @@ function unidadReferencia(texto: string): string | null {
   return null;
 }
 
+function pesoPiezaVariableKg(nombre: string, tieneReferencia: boolean) {
+  if (tieneReferencia) return null;
+  const coincidencia = nombre.match(
+    /\b(?:peso\s+aproximado\s+)?pieza\s+(\d+(?:[.,]\d+)?)\s*kg\b/i,
+  );
+  if (!coincidencia) return null;
+  const peso = Number(coincidencia[1].replace(",", "."));
+  return Number.isFinite(peso) && peso > 0 ? peso : null;
+}
+
+function redondearPrecio(precio: number) {
+  return Math.round(precio * 100) / 100;
+}
+
 function extraerEstado(html: string): EstadoElCorteIngles | null {
   const inicioMarcador = html.indexOf(MARCADOR_ESTADO);
   if (inicioMarcador < 0) return null;
@@ -135,6 +149,13 @@ function convertirProductoEstructurado(
 
   const rebajado = precioLista !== null && precioLista > precioVenta;
   const textoReferencia = variante?.pumOrPackComposition ?? "";
+  const precioReferenciaDeclarado = numeroPositivo(textoReferencia);
+  const unidadReferenciaDeclarada = unidadReferencia(textoReferencia);
+  const pesoVariableKg = pesoPiezaVariableKg(
+    nombre,
+    precioReferenciaDeclarado !== null || unidadReferenciaDeclarada !== null,
+  );
+  const factorPrecioEnvase = pesoVariableKg ?? 1;
   const imagen =
     producto.priority_image?.default_source ??
     producto.priority_image?.sources?.medium ??
@@ -155,10 +176,14 @@ function convertirProductoEstructurado(
     marcaOriginal: producto.brand?.name?.trim() || null,
     categoriaOriginal: null,
     categoriaSugerida: obtenerCategoriaSugerida(consulta),
-    precio: rebajado ? precioLista : precioVenta,
-    precioPromocional: rebajado ? precioVenta : null,
-    precioReferencia: numeroPositivo(textoReferencia),
-    unidadReferencia: unidadReferencia(textoReferencia),
+    precio: redondearPrecio(
+      (rebajado ? precioLista : precioVenta) * factorPrecioEnvase,
+    ),
+    precioPromocional: rebajado
+      ? redondearPrecio(precioVenta * factorPrecioEnvase)
+      : null,
+    precioReferencia: pesoVariableKg ? precioVenta : precioReferenciaDeclarado,
+    unidadReferencia: pesoVariableKg ? "KG" : unidadReferenciaDeclarada,
     textoPromocion: rebajado
       ? descuento > 0
         ? `${descuento}% de descuento`
@@ -337,6 +362,13 @@ export function parsearResultadosElCorteIngles(
         ".promotion",
         "[class*='promo']",
       ]) || null;
+    const precioReferenciaDeclarado = numeroPositivo(textoReferencia);
+    const unidadReferenciaDeclarada = unidadReferencia(textoReferencia);
+    const pesoVariableKg = pesoPiezaVariableKg(
+      nombre,
+      precioReferenciaDeclarado !== null || unidadReferenciaDeclarada !== null,
+    );
+    const factorPrecioEnvase = pesoVariableKg ?? 1;
     const imagen =
       primerAtributo(tarjeta, ["img"], "src") ??
       primerAtributo(tarjeta, ["img"], "data-src") ??
@@ -350,10 +382,16 @@ export function parsearResultadosElCorteIngles(
         primerTexto(tarjeta, [".product_preview-brand", ".product-brand"]) || null,
       categoriaOriginal: categoria,
       categoriaSugerida: obtenerCategoriaSugerida(consulta),
-      precio: rebajado ? precioLista : precioActual,
-      precioPromocional: rebajado ? precioActual : null,
-      precioReferencia: numeroPositivo(textoReferencia),
-      unidadReferencia: unidadReferencia(textoReferencia),
+      precio: redondearPrecio(
+        (rebajado ? precioLista : precioActual) * factorPrecioEnvase,
+      ),
+      precioPromocional: rebajado
+        ? redondearPrecio(precioActual * factorPrecioEnvase)
+        : null,
+      precioReferencia: pesoVariableKg
+        ? precioActual
+        : precioReferenciaDeclarado,
+      unidadReferencia: pesoVariableKg ? "KG" : unidadReferenciaDeclarada,
       textoPromocion: promocion ?? (rebajado ? "Oferta El Corte Inglés" : null),
       fechaInicioPromocion: null,
       fechaFinPromocion: null,

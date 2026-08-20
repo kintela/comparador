@@ -43,7 +43,7 @@ type ArticuloLista = {
   id: string;
   termino: string;
   cantidad: number;
-  unidadCantidad: "UD" | "KG";
+  unidadCantidad: "UD" | "KG" | "L";
 };
 
 type MejorPrecio = {
@@ -87,6 +87,12 @@ const REFERENCIA_UN_KILO: ReferenciaComparacion = {
   unidad: "KG",
   cantidadBase: 1000,
   unidadVisual: "g",
+};
+const REFERENCIA_UN_LITRO: ReferenciaComparacion = {
+  cantidad: 1,
+  unidad: "L",
+  cantidadBase: 1000,
+  unidadVisual: "ml",
 };
 
 function crearId() {
@@ -191,7 +197,10 @@ export function CalculadoraLista() {
                 )
                 .map((item) => ({
                   ...item,
-                  unidadCantidad: item.unidadCantidad === "KG" ? "KG" as const : "UD" as const,
+                  unidadCantidad:
+                    item.unidadCantidad === "KG" || item.unidadCantidad === "L"
+                      ? item.unidadCantidad
+                      : "UD" as const,
                 }))
                 .slice(0, 20),
             );
@@ -299,12 +308,12 @@ export function CalculadoraLista() {
           ? {
               ...articulo,
               cantidad: Math.min(
-                articulo.unidadCantidad === "KG" ? 50 : 20,
+                articulo.unidadCantidad === "UD" ? 20 : 50,
                 Math.max(
-                  articulo.unidadCantidad === "KG" ? 0.25 : 1,
+                  articulo.unidadCantidad === "UD" ? 1 : 0.25,
                   Math.round(
                     (articulo.cantidad +
-                      direccion * (articulo.unidadCantidad === "KG" ? 0.25 : 1)) *
+                      direccion * (articulo.unidadCantidad === "UD" ? 1 : 0.25)) *
                       100,
                   ) / 100,
                 ),
@@ -316,7 +325,10 @@ export function CalculadoraLista() {
     setResultados(null);
   }
 
-  function cambiarUnidadCantidad(id: string, unidadCantidad: "UD" | "KG") {
+  function cambiarUnidadCantidad(
+    id: string,
+    unidadCantidad: ArticuloLista["unidadCantidad"],
+  ) {
     setArticulos((actuales) =>
       actuales.map((articulo) =>
         articulo.id === id
@@ -383,6 +395,8 @@ export function CalculadoraLista() {
           const referenciaComparacion =
             articulo.unidadCantidad === "KG"
               ? REFERENCIA_UN_KILO
+              : articulo.unidadCantidad === "L"
+                ? REFERENCIA_UN_LITRO
               : crearReferenciaComparacionAutomatica(
                   terminoResuelto,
                   candidatos.flatMap(({ producto }) =>
@@ -535,7 +549,7 @@ export function CalculadoraLista() {
           <div>
             <h2 className="text-xl font-bold">Productos de la lista</h2>
             <p className="mt-1 text-sm text-[#71837c]">
-              Ajusta la cantidad y elige si la necesitas por unidades o por kilos.
+              Ajusta la cantidad y elige si la necesitas por unidades, kilos o litros.
             </p>
           </div>
           {articulos.length > 0 && (
@@ -574,6 +588,10 @@ export function CalculadoraLista() {
                     <p className="mt-0.5 text-xs text-[#71837c]">
                       Cantidad solicitada por peso
                     </p>
+                  ) : articulo.unidadCantidad === "L" ? (
+                    <p className="mt-0.5 text-xs text-[#71837c]">
+                      Cantidad solicitada por volumen
+                    </p>
                   ) : obtenerPesoMedioPiezaKg(articulo.termino) !== null && (
                     <p className="mt-0.5 text-xs text-[#71837c]">
                       Por piezas · ≈{" "}
@@ -610,7 +628,11 @@ export function CalculadoraLista() {
                   onChange={(evento) =>
                     cambiarUnidadCantidad(
                       articulo.id,
-                      evento.target.value === "KG" ? "KG" : "UD",
+                      evento.target.value === "KG"
+                        ? "KG"
+                        : evento.target.value === "L"
+                          ? "L"
+                          : "UD",
                     )
                   }
                   aria-label={`Unidad de cantidad de ${articulo.termino}`}
@@ -618,6 +640,7 @@ export function CalculadoraLista() {
                 >
                   <option value="UD">ud.</option>
                   <option value="KG">kg</option>
+                  <option value="L">lt</option>
                 </select>
                 <button
                   type="button"
