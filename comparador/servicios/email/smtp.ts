@@ -53,11 +53,18 @@ export async function enviarCorreo({
   asunto,
   texto,
   html,
+  adjuntos,
 }: {
   destinatario: string;
   asunto: string;
   texto: string;
   html: string;
+  adjuntos?: Array<{
+    filename: string;
+    content: Buffer;
+    contentType: string;
+    cid: string;
+  }>;
 }): Promise<{ messageId: string }> {
   const remitente = variableObligatoria("SMTP_FROM_EMAIL");
   const transporte = nodemailer.createTransport(configuracionSmtp());
@@ -69,6 +76,7 @@ export async function enviarCorreo({
       subject: asunto,
       text: texto,
       html,
+      attachments: adjuntos,
     });
     return { messageId: resultado.messageId };
   } finally {

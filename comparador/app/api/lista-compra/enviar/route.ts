@@ -4,6 +4,7 @@ import {
   validarListaCompraCorreo,
 } from "@/servicios/email/lista-compra";
 import { esDireccionCorreoValida } from "@/servicios/email/validacion-correo";
+import { adjuntarImagenesLista } from "@/servicios/email/imagenes-lista-compra";
 
 export const runtime = "nodejs";
 
@@ -75,13 +76,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const correo = crearCorreoListaCompra(lista);
   try {
+    const contenido = await adjuntarImagenesLista(lista);
+    const correo = crearCorreoListaCompra(contenido.lista);
     await enviarCorreo({
       destinatario,
       asunto: "Tu lista de la compra comparada",
       texto: correo.texto,
       html: correo.html,
+      adjuntos: contenido.adjuntos,
     });
     return Response.json({ ok: true });
   } catch (error) {
