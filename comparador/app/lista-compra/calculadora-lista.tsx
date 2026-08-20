@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import { puntuacionRelevanciaProducto } from "@/servicios/busqueda/relevancia-producto";
+import { esDireccionCorreoValida } from "@/servicios/email/validacion-correo";
 import {
   calcularCosteArticulo,
   crearReferenciaComparacionAutomatica,
@@ -97,7 +98,6 @@ const SUPERMERCADOS = [
 const CLAVE_LISTA = "comparador-lista-compra-v1";
 const PARAMETRO_LISTA_COMPARTIDA = "lista";
 const URL_PUBLICA_LISTA = "https://comparador.kintela.es/lista-compra";
-const PATRON_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const REFERENCIA_UN_KILO: ReferenciaComparacion = {
   cantidad: 1,
   unidad: "KG",
@@ -905,7 +905,7 @@ function TablaComparacion({
     tipo: "error" | "exito";
     mensaje: string;
   } | null>(null);
-  const destinatarioCorreoValido = PATRON_CORREO.test(
+  const destinatarioCorreoValido = esDireccionCorreoValida(
     destinatarioCorreo.trim(),
   );
   const ordenOriginal = new Map<string, number>(

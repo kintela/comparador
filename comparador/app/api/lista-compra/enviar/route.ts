@@ -3,6 +3,7 @@ import {
   crearCorreoListaCompra,
   validarListaCompraCorreo,
 } from "@/servicios/email/lista-compra";
+import { esDireccionCorreoValida } from "@/servicios/email/validacion-correo";
 
 export const runtime = "nodejs";
 
@@ -10,14 +11,6 @@ const LIMITE_BYTES = 100_000;
 const VENTANA_MS = 15 * 60 * 1_000;
 const MAXIMO_ENVIOS = 5;
 const intentosPorOrigen = new Map<string, number[]>();
-
-function correoValido(valor: unknown): valor is string {
-  return (
-    typeof valor === "string" &&
-    valor.length <= 254 &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor)
-  );
-}
 
 function origenPermitido(request: Request) {
   const origen = request.headers.get("origin");
@@ -69,7 +62,7 @@ export async function POST(request: Request) {
   const destinatario =
     typeof cuerpo.destinatario === "string" ? cuerpo.destinatario.trim() : cuerpo.destinatario;
   const lista = validarListaCompraCorreo(cuerpo.lista);
-  if (!correoValido(destinatario) || !lista) {
+  if (!esDireccionCorreoValida(destinatario) || !lista) {
     return Response.json(
       { ok: false, error: "Revisa la dirección y el contenido de la lista." },
       { status: 400 },
