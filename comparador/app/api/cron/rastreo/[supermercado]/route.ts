@@ -42,11 +42,15 @@ function esSupermercado(valor: string): valor is SupermercadoRastreo {
   return SUPERMERCADOS_RASTREO.includes(valor as SupermercadoRastreo);
 }
 
+function filtrarErroresReales<T extends { mensaje: string }>(errores: T[]) {
+  return errores.filter((error) => !esRespuestaSinResultados(error.mensaje));
+}
+
 function crearResumen(
   resultado: {
     productos: unknown[];
     peticionesRealizadas: number;
-    errores: unknown[];
+    errores: Array<{ mensaje: string }>;
   },
   persistencia: { ejecucionId: string; preciosInsertados: number },
   solicitudesProcesadas: number,
@@ -54,7 +58,7 @@ function crearResumen(
   return {
     productosDetectados: resultado.productos.length,
     peticionesRealizadas: resultado.peticionesRealizadas,
-    erroresDetectados: resultado.errores.length,
+    erroresDetectados: filtrarErroresReales(resultado.errores).length,
     ejecucionId: persistencia.ejecucionId,
     preciosInsertados: persistencia.preciosInsertados,
     solicitudesProcesadas,
@@ -179,9 +183,7 @@ async function completarReferencias<R extends ResultadoFallback>({
     }
     const resultadoPersistencia = {
       ...resultado,
-      errores: resultado.errores.filter(
-        (error) => !esRespuestaSinResultados(error.mensaje),
-      ),
+      errores: filtrarErroresReales(resultado.errores),
     } as R;
     const persistencia = await persistir(
       productos,
@@ -342,7 +344,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoEroski({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -351,7 +353,7 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = resultado.errores.length > 0
+      const extra = filtrarErroresReales(resultado.errores).length > 0
         ? referenciasOmitidas()
         : await completarReferencias({
         supermercado,
@@ -382,7 +384,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoBm({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -391,7 +393,7 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = resultado.errores.length > 0
+      const extra = filtrarErroresReales(resultado.errores).length > 0
         ? referenciasOmitidas()
         : await completarReferencias({
         supermercado,
@@ -426,7 +428,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoMercadona({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         zona: resultado.zona,
         tipoRastreo,
       });
@@ -436,7 +438,7 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = resultado.errores.length > 0
+      const extra = filtrarErroresReales(resultado.errores).length > 0
         ? referenciasOmitidas()
         : await completarReferencias({
         supermercado,
@@ -470,7 +472,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoAldi({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -479,7 +481,7 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = resultado.errores.length > 0
+      const extra = filtrarErroresReales(resultado.errores).length > 0
         ? referenciasOmitidas()
         : await completarReferencias({
         supermercado,
@@ -510,7 +512,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoDia({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         codigoPostal: resultado.codigoPostal,
         tipoRastreo,
       });
@@ -551,7 +553,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoLidl({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -590,7 +592,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoAlcampo({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         regionId: resultado.regionId,
         tipoRastreo,
       });
@@ -616,7 +618,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoLupa({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -658,7 +660,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoCoviran({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -697,7 +699,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoCarrefour({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -736,7 +738,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoCostco({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -745,7 +747,7 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = resultado.errores.length > 0
+      const extra = filtrarErroresReales(resultado.errores).length > 0
         ? referenciasOmitidas()
         : await completarReferencias({
         supermercado,
@@ -777,7 +779,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoPrimaprix({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
       });
       const procesadas = await guardarResultadosSolicitudes(
@@ -818,7 +820,7 @@ async function ejecutarRastreo(
       const persistencia = await guardarRastreoElCorteIngles({
         productos: resultado.productos,
         consultas,
-        errores: resultado.errores,
+        errores: filtrarErroresReales(resultado.errores),
         centroEntrega: resultado.centroEntrega,
         tipoRastreo,
       });
@@ -828,7 +830,7 @@ async function ejecutarRastreo(
         resultado,
       );
       const resumen = crearResumen(resultado, persistencia, procesadas);
-      const extra = resultado.errores.length > 0
+      const extra = filtrarErroresReales(resultado.errores).length > 0
         ? referenciasOmitidas()
         : await completarReferencias({
         supermercado,

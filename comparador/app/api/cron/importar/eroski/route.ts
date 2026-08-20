@@ -76,10 +76,13 @@ export async function POST(request: Request) {
     );
   }
   try {
+    const erroresReales = carga.resultado.errores.filter(
+      (error) => !esRespuestaSinResultados(error.mensaje),
+    );
     const persistencia = await guardarRastreoEroski({
       productos: carga.resultado.productos,
       consultas: carga.consultas,
-      errores: carga.resultado.errores,
+      errores: erroresReales,
       tipoRastreo: "automatico",
     });
     const solicitudes = await obtenerSolicitudesAutomaticas("eroski");
@@ -105,7 +108,7 @@ export async function POST(request: Request) {
     return Response.json({
       ok: true,
       productos: carga.resultado.productos.length,
-      errores: carga.resultado.errores.length,
+      errores: erroresReales.length,
       precios: persistencia.preciosInsertados,
     });
   } finally {
