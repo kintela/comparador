@@ -137,6 +137,13 @@ export function puntuacionRelevanciaProducto(
   ) {
     return 0;
   }
+  if (
+    /\baceite de oliva virgen extra\b/.test(consultaNormalizada) &&
+    (/\b(?:con|en) aceite de oliva virgen extra\b/.test(nombre) ||
+      /\baceite de oliva suave\b|\baceites? refinad[oa]s?\b/.test(nombre))
+  ) {
+    return 0;
+  }
 
   let mejor = 0;
   let comienzaPorConsulta = false;
