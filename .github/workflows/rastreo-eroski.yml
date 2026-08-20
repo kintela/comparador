@@ -24,5 +24,5 @@ jobs:
       - run: npm ci
       - run: npm run rastreo:eroski:automatico
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          COMPARADOR_URL: https://comparador.kintela.es
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
