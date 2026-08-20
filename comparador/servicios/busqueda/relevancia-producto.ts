@@ -128,6 +128,14 @@ export function puntuacionRelevanciaProducto(
 ) {
   const nombre = normalizar(nombreProducto);
   const consultaNormalizada = normalizar(consulta);
+  const consultaEsPastaRellena =
+    /\bpastas?\b/.test(consultaNormalizada) &&
+    /\brellen[oa]s?\b/.test(consultaNormalizada);
+  const nombreEsPastaRellena =
+    /\bpastas?\b.*\brellen[oa]s?\b/.test(nombre) ||
+    /\b(raviolis?|tortellos?|tortellinis?|tortellonis?|cappellettis?|agnolottis?|panzerottis?|mezzelunas?|medialunas?|girasolis?|girasoles)\b/.test(
+      nombre,
+    );
 
   // En denominaciones con una calidad concreta no basta con que coincidan
   // "aceite" y "oliva": un aceite suave o intenso no es virgen extra.
@@ -145,14 +153,8 @@ export function puntuacionRelevanciaProducto(
     return 0;
   }
   if (
-    /\bpastas?\b/.test(consultaNormalizada) &&
-    /\brellen[oa]s?\b/.test(consultaNormalizada) &&
-    !(
-      /\bpastas?\b.*\brellen[oa]s?\b/.test(nombre) ||
-      /\b(raviolis?|tortellos?|tortellinis?|tortellonis?|cappellettis?|agnolottis?|panzerottis?|mezzelunas?|medialunas?|girasolis?|girasoles)\b/.test(
-        nombre,
-      )
-    )
+    consultaEsPastaRellena &&
+    !nombreEsPastaRellena
   ) {
     return 0;
   }
@@ -191,6 +193,10 @@ export function puntuacionRelevanciaProducto(
         mejor = Math.max(mejor, 200 + palabrasCoincidentes * 20);
       }
     }
+  }
+
+  if (consultaEsPastaRellena && nombreEsPastaRellena) {
+    mejor = Math.max(mejor, 400);
   }
 
   if (obtenerCategoriaSugerida(consulta) === "Frutas") {
