@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import { puntuacionRelevanciaProducto } from "@/servicios/busqueda/relevancia-producto";
+import { esDireccionCorreoValida } from "@/servicios/email/validacion-correo";
 import {
   calcularCosteArticulo,
   crearReferenciaComparacionAutomatica,
@@ -96,6 +97,7 @@ const SUPERMERCADOS = [
 
 const CLAVE_LISTA = "comparador-lista-compra-v1";
 const PARAMETRO_LISTA_COMPARTIDA = "lista";
+const URL_PUBLICA = "https://comparador.kintela.es";
 const URL_PUBLICA_LISTA = "https://comparador.kintela.es/lista-compra";
 const REFERENCIA_UN_KILO: ReferenciaComparacion = {
   cantidad: 1,
@@ -112,6 +114,15 @@ const REFERENCIA_UN_LITRO: ReferenciaComparacion = {
 
 function crearId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+}
+
+function crearUrlPublicaRecurso(valor: string | null) {
+  if (!valor) return null;
+  try {
+    return new URL(valor, URL_PUBLICA).toString();
+  } catch {
+    return null;
+  }
 }
 
 function codificarListaCompartida(articulos: ArticuloLista[]) {
@@ -897,6 +908,16 @@ function TablaComparacion({
     ...SUPERMERCADOS,
   ]);
   const [soloCestasCompletas, setSoloCestasCompletas] = useState(false);
+  const [modalCorreoAbierto, setModalCorreoAbierto] = useState(false);
+  const [destinatarioCorreo, setDestinatarioCorreo] = useState("");
+  const [enviandoCorreo, setEnviandoCorreo] = useState(false);
+  const [estadoCorreo, setEstadoCorreo] = useState<{
+    tipo: "error" | "exito";
+    mensaje: string;
+  } | null>(null);
+  const destinatarioCorreoValido = esDireccionCorreoValida(
+    destinatarioCorreo.trim(),
+  );
   const ordenOriginal = new Map<string, number>(
     SUPERMERCADOS.map((supermercado, indice) => [supermercado, indice]),
   );
@@ -935,7 +956,112 @@ function TablaComparacion({
     });
   }
 
+  function crearListaParaCorreo() {
+    const filas = articulos.map((articulo) => {
+      const resultado = resultados.find(
+        (item) => item.articuloId === articulo.id,
+      );
+      const cantidad = `${cantidadTexto(articulo.cantidad)} ${etiquetaCantidadArticulo(
+        resultado?.terminoResuelto ?? articulo.termino,
+        articulo.cantidad,
+        resultado?.referenciaComparacion,
+        articulo.unidadCantidad,
+      )}`;
+      const celdas = visibles.map((supermercado) => {
+        const precio = resultado?.precios[supermercado];
+        if (!precio) return null;
+        const calculo = calcularCosteArticulo({
+          consulta: resultado?.terminoResuelto ?? articulo.termino,
+          cantidad: articulo.cantidad,
+          precio: precio.precio,
+          precioReferencia: precio.precioReferencia,
+          unidadReferencia: precio.unidadReferencia,
+          nombreProducto: precio.nombreProducto,
+          referenciaComparacion: resultado?.referenciaComparacion,
+        });
+        const detalles: string[] = [];
+        if (calculo.normalizado) {
+          detalles.push(`por ${calculo.cantidadComparableTexto}`);
+          if (calculo.cantidadEnvaseTexto) {
+            detalles.push(
+              `Envase: ${moneda(precio.precio)} · ${calculo.cantidadEnvaseTexto}`,
+            );
+          }
+          detalles.push(
+            `${moneda(calculo.precioKg ?? 0)} /${calculo.unidadComparable}`,
+          );
+          if (calculo.notaComparacion) detalles.push(calculo.notaComparacion);
+        } else if (calculo.estimado) {
+          detalles.push(
+            `≈ ${moneda(calculo.precioPorPieza ?? 0)} / pieza`,
+            `${moneda(calculo.precioKg ?? 0)} / kg · peso estimado ${Math.round((calculo.pesoMedioPiezaKg ?? 0) * 1000)} g`,
+          );
+        } else if (articulo.cantidad > 1) {
+          detalles.push(`${moneda(precio.precio)} / ud.`);
+        }
+        return {
+          supermercado,
+          nombreProducto: precio.nombreProducto,
+          imagenProducto: crearUrlPublicaRecurso(precio.imagenProducto),
+          total: calculo.total,
+          estimado: calculo.estimado,
+          detalles,
+          urlProducto: precio.urlProducto,
+        };
+      });
+      return { producto: articulo.termino, cantidad, celdas };
+    });
+    return {
+      supermercados: visibles,
+      filas,
+      totales: totalesVisibles.map((total) => ({
+        supermercado: total.supermercado,
+        total: total.total,
+        encontrados: total.encontrados,
+        completa: total.completa,
+        estimado: total.estimado,
+        ganador: total.completa && total.total === totalMasBarato,
+      })),
+    };
+  }
+
+  async function enviarListaPorCorreo(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    if (!destinatarioCorreoValido) return;
+    setEnviandoCorreo(true);
+    setEstadoCorreo(null);
+    try {
+      const respuesta = await fetch("/api/lista-compra/enviar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destinatario: destinatarioCorreo.trim(),
+          lista: crearListaParaCorreo(),
+        }),
+      });
+      const datos = (await respuesta.json()) as { ok?: boolean; error?: string };
+      if (!respuesta.ok || !datos.ok) {
+        throw new Error(datos.error || "No se pudo enviar el correo.");
+      }
+      setEstadoCorreo({
+        tipo: "exito",
+        mensaje: `Lista enviada a ${destinatarioCorreo.trim()}.`,
+      });
+    } catch (error) {
+      setEstadoCorreo({
+        tipo: "error",
+        mensaje:
+          error instanceof Error
+            ? error.message
+            : "No se pudo enviar el correo.",
+      });
+    } finally {
+      setEnviandoCorreo(false);
+    }
+  }
+
   return (
+    <>
     <section className="-mx-5 overflow-hidden border-y border-[#17352b]/10 bg-white shadow-[0_18px_55px_rgba(23,53,43,0.08)] sm:mx-0 sm:rounded-3xl sm:border">
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#17352b]/10 px-4 py-5 sm:px-7 sm:py-6">
         <div>
@@ -991,6 +1117,17 @@ function TablaComparacion({
           )}
         </div>
         <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              setEstadoCorreo(null);
+              setModalCorreoAbierto(true);
+            }}
+            className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-[#176b50]/25 bg-white px-3 py-2 text-xs font-bold text-[#176b50] transition hover:bg-[#e7f5ee] sm:min-h-9 sm:flex-none"
+          >
+            <span aria-hidden="true">✉</span>
+            Enviar por correo
+          </button>
           <button
             type="button"
             onClick={() => setSoloCestasCompletas((actual) => !actual)}
@@ -1262,5 +1399,122 @@ function TablaComparacion({
         </table>
       </div>
     </section>
+      {modalCorreoAbierto && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-[#0d211b]/70 p-4 backdrop-blur-sm"
+          onMouseDown={(evento) => {
+            if (evento.target === evento.currentTarget && !enviandoCorreo) {
+              setModalCorreoAbierto(false);
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-enviar-lista"
+            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl sm:p-7"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-[#16805e]">
+                  Compartir lista
+                </p>
+                <h2 id="titulo-enviar-lista" className="mt-1 text-2xl font-extrabold">
+                  Enviar por correo
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalCorreoAbierto(false)}
+                disabled={enviandoCorreo}
+                aria-label="Cerrar"
+                className="grid size-9 shrink-0 place-items-center rounded-lg border border-[#17352b]/15 text-xl text-[#60766e] hover:bg-[#f7f5ee] disabled:opacity-40"
+              >
+                ×
+              </button>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-[#60766e]">
+              El correo incluirá los {articulos.length} productos y únicamente
+              los {visibles.length} supermercados que tienes visibles ahora.
+            </p>
+            <form onSubmit={enviarListaPorCorreo} className="mt-5">
+              <label
+                htmlFor="destinatario-lista"
+                className="text-sm font-bold text-[#17352b]"
+              >
+                Dirección de correo
+              </label>
+              <input
+                id="destinatario-lista"
+                type="email"
+                required
+                maxLength={254}
+                autoComplete="email"
+                autoFocus
+                value={destinatarioCorreo}
+                onChange={(evento) => {
+                  setDestinatarioCorreo(evento.target.value);
+                  setEstadoCorreo(null);
+                }}
+                placeholder="nombre@ejemplo.com"
+                disabled={enviandoCorreo}
+                aria-invalid={
+                  destinatarioCorreo.length > 0 && !destinatarioCorreoValido
+                }
+                aria-describedby={
+                  destinatarioCorreo.length > 0 && !destinatarioCorreoValido
+                    ? "error-destinatario-lista"
+                    : undefined
+                }
+                className={`mt-2 h-12 w-full rounded-xl border bg-white px-4 text-base outline-none transition disabled:bg-[#f7f5ee] ${
+                  destinatarioCorreo.length > 0 && !destinatarioCorreoValido
+                    ? "border-red-400 focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                    : "border-[#17352b]/20 focus:border-[#176b50] focus:ring-4 focus:ring-[#176b50]/10"
+                }`}
+              />
+              {destinatarioCorreo.length > 0 && !destinatarioCorreoValido && (
+                <p
+                  id="error-destinatario-lista"
+                  className="mt-2 text-sm font-semibold text-red-700"
+                >
+                  Introduce una dirección válida, por ejemplo nombre@dominio.com.
+                </p>
+              )}
+              {estadoCorreo && (
+                <p
+                  role="status"
+                  className={`mt-3 rounded-xl px-4 py-3 text-sm font-semibold ${
+                    estadoCorreo.tipo === "exito"
+                      ? "bg-[#e7f5ee] text-[#176b50]"
+                      : "bg-red-50 text-red-700"
+                  }`}
+                >
+                  {estadoCorreo.mensaje}
+                </p>
+              )}
+              <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setModalCorreoAbierto(false)}
+                  disabled={enviandoCorreo}
+                  className="h-11 rounded-xl border border-[#17352b]/15 px-5 text-sm font-bold text-[#17352b] hover:bg-[#f7f5ee] disabled:opacity-40"
+                >
+                  {estadoCorreo?.tipo === "exito" ? "Cerrar" : "Cancelar"}
+                </button>
+                {estadoCorreo?.tipo !== "exito" && (
+                  <button
+                    type="submit"
+                    disabled={enviandoCorreo || !destinatarioCorreoValido}
+                    className="h-11 rounded-xl bg-[#176b50] px-5 text-sm font-bold text-white transition hover:bg-[#125d45] disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {enviandoCorreo ? "Enviando…" : "Enviar lista"}
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
