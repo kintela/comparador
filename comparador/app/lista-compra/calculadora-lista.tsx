@@ -163,7 +163,7 @@ function decodificarListaCompartida(valor: string): ArticuloLista[] | null {
         return null;
       }
       const unidad = unidadCantidad as ArticuloLista["unidadCantidad"];
-      const cantidadMinima = unidad === "UD" ? 1 : 0.25;
+      const cantidadMinima = unidad === "UD" ? 1 : 0.001;
       const cantidadMaxima = unidad === "UD" ? 20 : 50;
       if (
         cantidad < cantidadMinima ||
@@ -243,7 +243,26 @@ function moneda(valor: number) {
 }
 
 function cantidadTexto(valor: number) {
-  return valor.toLocaleString("es-ES", { maximumFractionDigits: 2 });
+  return valor.toLocaleString("es-ES", { maximumFractionDigits: 3 });
+}
+
+function interpretarCantidad(
+  valor: string,
+  unidad: ArticuloLista["unidadCantidad"],
+) {
+  const texto = valor.trim().replace(",", ".");
+  const formatoValido =
+    unidad === "UD"
+      ? /^\d+$/.test(texto)
+      : /^(?:\d+(?:\.\d{0,3})?|\.\d{1,3})$/.test(texto);
+  if (!formatoValido) return null;
+
+  const cantidad = Number(texto);
+  const minima = unidad === "UD" ? 1 : 0.001;
+  const maxima = unidad === "UD" ? 20 : 50;
+  return Number.isFinite(cantidad) && cantidad >= minima && cantidad <= maxima
+    ? cantidad
+    : null;
 }
 
 function requiereCargaDirecta(url: string) {
@@ -419,23 +438,13 @@ export function CalculadoraLista() {
     );
   }
 
-  function cambiarCantidad(id: string, direccion: -1 | 1) {
+  function cambiarCantidad(id: string, cantidad: number) {
     setArticulos((actuales) =>
       actuales.map((articulo) =>
         articulo.id === id
           ? {
               ...articulo,
-              cantidad: Math.min(
-                articulo.unidadCantidad === "UD" ? 20 : 50,
-                Math.max(
-                  articulo.unidadCantidad === "UD" ? 1 : 0.25,
-                  Math.round(
-                    (articulo.cantidad +
-                      direccion * (articulo.unidadCantidad === "UD" ? 1 : 0.25)) *
-                      100,
-                  ) / 100,
-                ),
-              ),
+              cantidad,
             }
           : articulo,
       ),
@@ -741,11 +750,15 @@ export function CalculadoraLista() {
                     </p>
                     {articulo.unidadCantidad === "KG" ? (
                       <p className="mt-0.5 text-xs text-[#71837c]">
-                        Cantidad solicitada por peso
+                        {articulo.cantidad < 1
+                          ? `${cantidadTexto(articulo.cantidad * 1000)} g solicitados`
+                          : "Cantidad solicitada por peso"}
                       </p>
                     ) : articulo.unidadCantidad === "L" ? (
                       <p className="mt-0.5 text-xs text-[#71837c]">
-                        Cantidad solicitada por volumen
+                        {articulo.cantidad < 1
+                          ? `${cantidadTexto(articulo.cantidad * 1000)} ml solicitados`
+                          : "Cantidad solicitada por volumen"}
                       </p>
                     ) : obtenerPesoMedioPiezaKg(articulo.termino) !== null && (
                       <p className="mt-0.5 text-xs text-[#71837c]">
@@ -759,27 +772,49 @@ export function CalculadoraLista() {
                   </div>
                 </div>
                 <div className="flex w-full min-w-0 items-center justify-between gap-1 sm:justify-end sm:gap-2 sm:pl-12">
-                  <div className="flex shrink-0 items-center rounded-lg border border-[#17352b]/10 bg-white">
-                    <button
-                      type="button"
-                      onClick={() => cambiarCantidad(articulo.id, -1)}
-                      aria-label={`Reducir cantidad de ${articulo.termino}`}
-                      className="grid size-10 place-items-center text-lg text-[#60766e] hover:text-[#176b50] sm:size-8"
-                    >
-                      −
-                    </button>
-                    <span className="min-w-8 text-center text-sm font-extrabold">
-                      {cantidadTexto(articulo.cantidad)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => cambiarCantidad(articulo.id, 1)}
-                      aria-label={`Aumentar cantidad de ${articulo.termino}`}
-                      className="grid size-10 place-items-center text-lg text-[#60766e] hover:text-[#176b50] sm:size-8"
-                    >
-                      +
-                    </button>
-                  </div>
+                  <input
+                    key={`${articulo.id}-${articulo.unidadCantidad}`}
+                    type="text"
+                    inputMode={
+                      articulo.unidadCantidad === "UD" ? "numeric" : "decimal"
+                    }
+                    defaultValue={cantidadTexto(articulo.cantidad)}
+                    onFocus={(evento) => evento.currentTarget.select()}
+                    onChange={(evento) => {
+                      const cantidad = interpretarCantidad(
+                        evento.currentTarget.value,
+                        articulo.unidadCantidad,
+                      );
+                      if (cantidad !== null) {
+                        cambiarCantidad(articulo.id, cantidad);
+                      }
+                    }}
+                    onKeyDown={(evento) => {
+                      if (evento.key === "Enter") evento.currentTarget.blur();
+                    }}
+                    onBlur={(evento) => {
+                      const cantidad = interpretarCantidad(
+                        evento.currentTarget.value,
+                        articulo.unidadCantidad,
+                      );
+                      if (cantidad === null) {
+                        evento.currentTarget.value = cantidadTexto(
+                          articulo.cantidad,
+                        );
+                        setMensaje(
+                          articulo.unidadCantidad === "UD"
+                            ? "Introduce entre 1 y 20 unidades enteras."
+                            : "Introduce una cantidad entre 0,001 y 50 con hasta tres decimales.",
+                        );
+                        return;
+                      }
+                      evento.currentTarget.value = cantidadTexto(cantidad);
+                      cambiarCantidad(articulo.id, cantidad);
+                      setMensaje(null);
+                    }}
+                    aria-label={`Cantidad de ${articulo.termino}`}
+                    className="h-10 w-20 shrink-0 rounded-lg border border-[#17352b]/10 bg-white px-3 text-center text-sm font-extrabold text-[#17352b] outline-none focus:border-[#176b50] sm:h-8"
+                  />
                   <select
                     value={articulo.unidadCantidad}
                     onChange={(evento) =>

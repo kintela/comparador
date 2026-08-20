@@ -58,6 +58,32 @@ type EstadoElCorteIngles = {
   }>;
 };
 
+type ProductoPaginaElCorteIngles = {
+  id?: string;
+  description?: string;
+  brand?: { name?: string };
+  image?: string;
+  priceSpecification?: {
+    price?: string;
+    salePrice?: string;
+    measurementUnitPrice?: string;
+    pum_description?: string;
+  };
+  categories?: Array<{ name?: string }>;
+  url?: string;
+  status_flow?: string;
+  show_sell_data?: { button_add_to_cart?: boolean };
+};
+
+type EstadoPaginaElCorteIngles = {
+  viewData?: {
+    plp?: {
+      products?: ProductoPaginaElCorteIngles[];
+      pagination?: { count?: number };
+    };
+  };
+};
+
 function numeroPositivo(texto: string | undefined): number | null {
   if (!texto) return null;
   const coincidencia = texto.match(/\d[\d.]*,\d{1,2}|\d+(?:[.,]\d{1,2})?/);
@@ -121,6 +147,22 @@ function extraerEstado(html: string): EstadoElCorteIngles | null {
 
   try {
     return JSON.parse(html.slice(inicio, finAsignacion).trim()) as EstadoElCorteIngles;
+  } catch {
+    return null;
+  }
+}
+
+function extraerEstadoPagina(html: string): EstadoPaginaElCorteIngles | null {
+  const inicioMarcador = html.indexOf(MARCADOR_ESTADO);
+  if (inicioMarcador < 0) return null;
+  const inicio = inicioMarcador + MARCADOR_ESTADO.length;
+  const finScript = html.indexOf("document.body.removeChild", inicio);
+  if (finScript < 0) return null;
+
+  try {
+    return JSON.parse(
+      html.slice(inicio, finScript).trim().replace(/;\s*$/, ""),
+    ) as EstadoPaginaElCorteIngles;
   } catch {
     return null;
   }
@@ -234,6 +276,108 @@ function parsearBloquesEstructurados(
     : null;
 }
 
+function convertirProductoPagina(
+  producto: ProductoPaginaElCorteIngles,
+  consulta: string,
+): ProductoElCorteIngles | null {
+  const ruta = producto.url?.trim();
+  const identificador =
+    producto.id?.trim() || (ruta && identificadorDesdeUrl(ruta));
+  const descripcion = producto.description?.trim();
+  const marca = producto.brand?.name?.trim() || null;
+  const precioLista = numeroPositivo(producto.priceSpecification?.price);
+  const precioVenta = numeroPositivo(
+    producto.priceSpecification?.salePrice ??
+      producto.priceSpecification?.price,
+  );
+  if (
+    !ruta?.startsWith("/supermercado/") ||
+    !identificador ||
+    !descripcion ||
+    precioVenta === null
+  ) {
+    return null;
+  }
+
+  const nombreSinMarcaFinal = marca
+    ? descripcion.replace(
+        new RegExp(
+          `\\s+-\\s+${marca.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\s*$`,
+          "i",
+        ),
+        "",
+      )
+    : descripcion;
+  const nombre =
+    `${marca?.toLocaleUpperCase("es") ?? ""} ${nombreSinMarcaFinal}`.trim();
+  const precioReferencia = numeroPositivo(
+    producto.priceSpecification?.measurementUnitPrice,
+  );
+  const unidad = unidadReferencia(
+    producto.priceSpecification?.pum_description ?? "",
+  );
+  const pesoVariableKg = pesoPiezaVariableKg(
+    nombre,
+    precioReferencia !== null || unidad !== null,
+  );
+  const factorPrecioEnvase = pesoVariableKg ?? 1;
+  const rebajado = precioLista !== null && precioLista > precioVenta;
+
+  return {
+    identificadorExterno: identificador,
+    ean: null,
+    nombreOriginal: nombre.replace(/\s+/g, " "),
+    marcaOriginal: marca,
+    categoriaOriginal:
+      producto.categories?.find((categoria) => categoria.name)?.name ?? null,
+    categoriaSugerida: obtenerCategoriaSugerida(consulta),
+    precio: redondearPrecio(
+      (rebajado ? precioLista : precioVenta) * factorPrecioEnvase,
+    ),
+    precioPromocional: rebajado
+      ? redondearPrecio(precioVenta * factorPrecioEnvase)
+      : null,
+    precioReferencia: pesoVariableKg ? precioVenta : precioReferencia,
+    unidadReferencia: pesoVariableKg ? "KG" : unidad,
+    textoPromocion: rebajado ? "Oferta El Corte Inglés" : null,
+    fechaInicioPromocion: null,
+    fechaFinPromocion: null,
+    disponible:
+      producto.show_sell_data?.button_add_to_cart !== false &&
+      !/sold.?out|no.?sale/i.test(producto.status_flow ?? ""),
+    urlProducto: new URL(ruta, ORIGEN_EL_CORTE_INGLES).toString(),
+    urlImagen: producto.image
+      ? new URL(producto.image, ORIGEN_EL_CORTE_INGLES).toString()
+      : null,
+  };
+}
+
+function parsearEstadoPagina(
+  estado: EstadoPaginaElCorteIngles | null,
+  consulta: string,
+  limite: number,
+): { total: number; productos: ProductoElCorteIngles[] } | null {
+  const listado = estado?.viewData?.plp?.products;
+  if (!listado) return null;
+
+  const productos = new Map<string, ProductoElCorteIngles>();
+  for (const productoPagina of listado) {
+    const producto = convertirProductoPagina(productoPagina, consulta);
+    if (producto) productos.set(producto.identificadorExterno, producto);
+    if (productos.size >= limite) break;
+  }
+
+  return productos.size > 0
+    ? {
+        total: Math.max(
+          estado?.viewData?.plp?.pagination?.count ?? 0,
+          productos.size,
+        ),
+        productos: [...productos.values()],
+      }
+    : null;
+}
+
 function primerTexto(
   elemento: cheerio.Cheerio<AnyNode>,
   selectores: string[],
@@ -316,6 +460,13 @@ export function parsearResultadosElCorteIngles(
     limite,
   );
   if (resultadoEstructurado) return resultadoEstructurado;
+
+  const resultadoPagina = parsearEstadoPagina(
+    extraerEstadoPagina(html),
+    consulta,
+    limite,
+  );
+  if (resultadoPagina) return resultadoPagina;
 
   const $ = cheerio.load(html);
   const productos = new Map<string, ProductoElCorteIngles>();
@@ -459,7 +610,7 @@ export async function rastrearProductosElCorteIngles({
       }
 
       const estado = (await respuesta.json()) as EstadoElCorteIngles;
-      const resultado = parsearBloquesEstructurados(
+      let resultado = parsearBloquesEstructurados(
         estado,
         consulta,
         Math.min(Math.max(1, limite), MAX_RESULTADOS_POR_PETICION),
@@ -469,9 +620,64 @@ export async function rastrearProductosElCorteIngles({
           "La API de El Corte Inglés no devolvió productos de supermercado",
         );
       }
+      let peticionesRealizadas = 1;
+      const objetivo = Math.min(
+        Math.max(1, limite),
+        MAX_RESULTADOS_POR_PETICION,
+      );
+
+      // La búsqueda multibloque devuelve solo 12 productos de supermercado.
+      // Completamos la primera página específica, que contiene hasta 24.
+      if (resultado.productos.length < objetivo) {
+        try {
+          const urlPagina = new URL(
+            "/supermercado/1/buscar/",
+            ORIGEN_EL_CORTE_INGLES,
+          );
+          urlPagina.searchParams.set("question", consulta);
+          urlPagina.searchParams.set("catalog", "supermercado");
+          urlPagina.searchParams.set("stype", "text_box");
+          const respuestaPagina = await fetchComoNavegador(urlPagina, {
+            headers: {
+              "Accept-Language": "es-ES,es;q=0.9",
+              Cookie: `home_delivery_center=${CENTRO_ENTREGA_REFERENCIA}`,
+              Referer: `${ORIGEN_EL_CORTE_INGLES}/supermercado/`,
+              "User-Agent": USER_AGENT,
+            },
+            redirect: "follow",
+          });
+          peticionesRealizadas += 1;
+          if (respuestaPagina.ok) {
+            const resultadoPagina = parsearResultadosElCorteIngles(
+              await respuestaPagina.text(),
+              consulta,
+              objetivo,
+            );
+            const productos = new Map(
+              resultado.productos.map((producto) => [
+                producto.identificadorExterno,
+                producto,
+              ]),
+            );
+            for (const producto of resultadoPagina.productos) {
+              if (!productos.has(producto.identificadorExterno)) {
+                productos.set(producto.identificadorExterno, producto);
+              }
+              if (productos.size >= objetivo) break;
+            }
+            resultado = {
+              total: Math.max(resultado.total, resultadoPagina.total),
+              productos: [...productos.values()].slice(0, objetivo),
+            };
+          }
+        } catch {
+          // Conservamos los resultados de la API si la página HTML está bloqueada.
+        }
+      }
+
       return {
         ...resultado,
-        peticionesRealizadas: 1,
+        peticionesRealizadas,
         centroEntrega: CENTRO_ENTREGA_REFERENCIA,
       };
     },

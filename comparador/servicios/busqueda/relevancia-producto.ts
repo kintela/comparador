@@ -128,6 +128,50 @@ export function puntuacionRelevanciaProducto(
 ) {
   const nombre = normalizar(nombreProducto);
   const consultaNormalizada = normalizar(consulta);
+  const consultaEsPastaRellena =
+    /\bpastas?\b/.test(consultaNormalizada) &&
+    /\brellen[oa]s?\b/.test(consultaNormalizada);
+  const nombreEsPastaRellena =
+    /\bpastas?\b.*\brellen[oa]s?\b/.test(nombre) ||
+    /\b(raviolis?|tortellos?|tortellinis?|tortellonis?|cappellettis?|agnolottis?|panzerottis?|mezzelunas?|medialunas?|girasolis?|girasoles)\b/.test(
+      nombre,
+    );
+  const consultaEsRopaOscura = /\boscur[oa]s?\b/.test(consultaNormalizada);
+  const nombreEsRopaOscura = /\b(oscur[oa]s?|negr[oa]s?|black)\b/.test(
+    nombre,
+  );
+
+  // En denominaciones con una calidad concreta no basta con que coincidan
+  // "aceite" y "oliva": un aceite suave o intenso no es virgen extra.
+  if (
+    /\bvirgen extra\b/.test(consultaNormalizada) &&
+    !/\bvirgen extra\b/.test(nombre)
+  ) {
+    return 0;
+  }
+  if (
+    /\baceite(?: de)? oliva virgen extra\b/.test(consultaNormalizada) &&
+    (/\b(?:con|en) aceite(?: de)? oliva virgen extra\b/.test(nombre) ||
+      /\baceite(?: de)? oliva suave\b|\baceites? refinad[oa]s?\b/.test(nombre))
+  ) {
+    return 0;
+  }
+  if (
+    consultaEsPastaRellena &&
+    !nombreEsPastaRellena
+  ) {
+    return 0;
+  }
+  if (/\bnorit\b/.test(consultaNormalizada) && !/\bnorit\b/.test(nombre)) {
+    return 0;
+  }
+  if (
+    consultaEsRopaOscura &&
+    !nombreEsRopaOscura
+  ) {
+    return 0;
+  }
+
   let mejor = 0;
   let comienzaPorConsulta = false;
   const variantes = variantesConsulta(consulta);
@@ -162,6 +206,18 @@ export function puntuacionRelevanciaProducto(
         mejor = Math.max(mejor, 200 + palabrasCoincidentes * 20);
       }
     }
+  }
+
+  if (consultaEsPastaRellena && nombreEsPastaRellena) {
+    mejor = Math.max(mejor, 400);
+  }
+  if (
+    consultaEsRopaOscura &&
+    nombreEsRopaOscura &&
+    /\bnorit\b/.test(consultaNormalizada) &&
+    /\bnorit\b/.test(nombre)
+  ) {
+    mejor = Math.max(mejor, 400);
   }
 
   if (obtenerCategoriaSugerida(consulta) === "Frutas") {
