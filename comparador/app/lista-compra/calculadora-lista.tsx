@@ -1,7 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 
 import { puntuacionRelevanciaProducto } from "@/servicios/busqueda/relevancia-producto";
 import {
@@ -46,6 +53,12 @@ type ArticuloLista = {
   unidadCantidad: "UD" | "KG" | "L";
 };
 
+type ArticuloCompartido = [
+  termino: string,
+  cantidad: number,
+  unidadCantidad: ArticuloLista["unidadCantidad"],
+];
+
 type MejorPrecio = {
   precio: number;
   precioReferencia: number | null;
@@ -82,6 +95,8 @@ const SUPERMERCADOS = [
 ] as const;
 
 const CLAVE_LISTA = "comparador-lista-compra-v1";
+const PARAMETRO_LISTA_COMPARTIDA = "lista";
+const URL_PUBLICA_LISTA = "https://comparador.kintela.es/lista-compra";
 const REFERENCIA_UN_KILO: ReferenciaComparacion = {
   cantidad: 1,
   unidad: "KG",
@@ -97,6 +112,82 @@ const REFERENCIA_UN_LITRO: ReferenciaComparacion = {
 
 function crearId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+}
+
+function codificarListaCompartida(articulos: ArticuloLista[]) {
+  const contenido: ArticuloCompartido[] = articulos.map((articulo) => [
+    articulo.termino,
+    articulo.cantidad,
+    articulo.unidadCantidad,
+  ]);
+  const bytes = new TextEncoder().encode(JSON.stringify(contenido));
+  let binario = "";
+  for (const byte of bytes) binario += String.fromCharCode(byte);
+  return btoa(binario)
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/g, "");
+}
+
+function decodificarListaCompartida(valor: string): ArticuloLista[] | null {
+  if (!valor || valor.length > 8000) return null;
+
+  try {
+    const base64 = valor
+      .replaceAll("-", "+")
+      .replaceAll("_", "/")
+      .padEnd(Math.ceil(valor.length / 4) * 4, "=");
+    const binario = atob(base64);
+    const bytes = Uint8Array.from(binario, (caracter) =>
+      caracter.charCodeAt(0),
+    );
+    const contenido = JSON.parse(
+      new TextDecoder().decode(bytes),
+    ) as unknown;
+    if (!Array.isArray(contenido) || contenido.length === 0) return null;
+
+    const articulos = contenido.slice(0, 20).map((item) => {
+      if (!Array.isArray(item) || item.length !== 3) return null;
+      const [terminoOriginal, cantidad, unidadCantidad] = item;
+      const termino =
+        typeof terminoOriginal === "string"
+          ? terminoOriginal.trim().replace(/\s+/g, " ")
+          : "";
+      if (
+        termino.length < 2 ||
+        termino.length > 80 ||
+        typeof cantidad !== "number" ||
+        !Number.isFinite(cantidad) ||
+        !["UD", "KG", "L"].includes(String(unidadCantidad))
+      ) {
+        return null;
+      }
+      const unidad = unidadCantidad as ArticuloLista["unidadCantidad"];
+      const cantidadMinima = unidad === "UD" ? 1 : 0.25;
+      const cantidadMaxima = unidad === "UD" ? 20 : 50;
+      if (
+        cantidad < cantidadMinima ||
+        cantidad > cantidadMaxima ||
+        (unidad === "UD" && !Number.isInteger(cantidad))
+      ) {
+        return null;
+      }
+      return {
+        id: crearId(),
+        termino,
+        cantidad,
+        unidadCantidad: unidad,
+      } satisfies ArticuloLista;
+    });
+
+    return articulos.every(
+      (articulo): articulo is ArticuloLista => articulo !== null,
+    )
+      ? articulos
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalizarTermino(termino: string) {
@@ -180,11 +271,36 @@ export function CalculadoraLista() {
   const [resultados, setResultados] = useState<ResultadoArticulo[] | null>(null);
   const [calculando, setCalculando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [mensajeCompartir, setMensajeCompartir] = useState<string | null>(null);
   const [inicializada, setInicializada] = useState(false);
+  const cargarListaCompartida = useEffectEvent(
+    async (compartida: ArticuloLista[]) => {
+      await calcular(compartida);
+      setMensajeCompartir(
+        "Lista compartida cargada con los precios actuales.",
+      );
+    },
+  );
 
   useEffect(() => {
     const temporizador = window.setTimeout(() => {
       try {
+        const valorCompartido = new URLSearchParams(window.location.search).get(
+          PARAMETRO_LISTA_COMPARTIDA,
+        );
+        if (valorCompartido) {
+          const compartida = decodificarListaCompartida(valorCompartido);
+          if (compartida) {
+            setArticulos(compartida);
+            setMensajeCompartir(
+              "Lista compartida cargada. Actualizando los precios…",
+            );
+            void cargarListaCompartida(compartida);
+            return;
+          }
+          setMensajeCompartir("El enlace de la lista compartida no es válido.");
+        }
+
         const guardada = localStorage.getItem(CLAVE_LISTA);
         if (guardada) {
           const datos = JSON.parse(guardada) as ArticuloLista[];
@@ -348,14 +464,14 @@ export function CalculadoraLista() {
     setResultados(null);
   }
 
-  async function calcular() {
-    if (articulos.length === 0 || calculando) return;
+  async function calcular(articulosObjetivo = articulos) {
+    if (articulosObjetivo.length === 0 || calculando) return;
     setCalculando(true);
     setMensaje(null);
     setResultados(null);
 
     const respuestas = await Promise.all(
-      articulos.map(async (articulo): Promise<ResultadoArticulo> => {
+      articulosObjetivo.map(async (articulo): Promise<ResultadoArticulo> => {
         try {
           const parametros = new URLSearchParams({
             q: articulo.termino,
@@ -492,6 +608,22 @@ export function CalculadoraLista() {
     setCalculando(false);
   }
 
+  async function copiarEnlaceLista() {
+    const url = new URL(URL_PUBLICA_LISTA);
+    url.searchParams.set(
+      PARAMETRO_LISTA_COMPARTIDA,
+      codificarListaCompartida(articulos),
+    );
+
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      setMensajeCompartir("Enlace de la lista copiado.");
+    } catch {
+      window.prompt("Copia este enlace para compartir la lista:", url.toString());
+      setMensajeCompartir("Enlace preparado para compartir.");
+    }
+  }
+
   return (
     <div className="mt-10 space-y-8">
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -555,18 +687,38 @@ export function CalculadoraLista() {
             </p>
           </div>
           {articulos.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                setArticulos([]);
-                setResultados(null);
-              }}
-              className="text-sm font-bold text-[#a24a3f] hover:underline"
-            >
-              Vaciar lista
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void copiarEnlaceLista()}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#176b50]/20 bg-[#e7f5ee] px-3 py-2 text-sm font-bold text-[#176b50] transition hover:border-[#176b50]/40 hover:bg-[#d9efe5]"
+              >
+                <span aria-hidden="true">↗</span>
+                Copiar enlace
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setArticulos([]);
+                  setResultados(null);
+                  setMensajeCompartir(null);
+                }}
+                className="text-sm font-bold text-[#a24a3f] hover:underline"
+              >
+                Vaciar lista
+              </button>
+            </div>
           )}
         </div>
+
+        {mensajeCompartir && (
+          <p
+            className="mt-4 rounded-xl border border-[#16805e]/20 bg-[#e7f5ee] px-4 py-3 text-sm font-semibold text-[#176b50]"
+            role="status"
+          >
+            {mensajeCompartir}
+          </p>
+        )}
 
         {articulos.length === 0 ? (
           <div className="mt-6 rounded-2xl border border-dashed border-[#17352b]/20 bg-[#f7f5ee]/60 px-6 py-12 text-center text-[#71837c]">
