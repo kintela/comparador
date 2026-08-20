@@ -144,6 +144,15 @@ export function puntuacionRelevanciaProducto(
   ) {
     return 0;
   }
+  if (
+    /\bpastas?\b/.test(consultaNormalizada) &&
+    /\brellen[oa]s?\b/.test(consultaNormalizada) &&
+    !/\b(rellen[oa]s?|raviolis?|tortellinis?|tortellonis?|cappellettis?|agnolottis?|panzerottis?|mezzelunas?|girasolis?)\b/.test(
+      nombre,
+    )
+  ) {
+    return 0;
+  }
 
   let mejor = 0;
   let comienzaPorConsulta = false;
