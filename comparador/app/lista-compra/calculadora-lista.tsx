@@ -164,8 +164,10 @@ function requiereCargaDirecta(url: string) {
   }
   try {
     return [
+      "supermercado.eroski.es",
       "www.lupaonline.com",
       "www.compraonline.alcampo.es",
+      "www.dia.es",
     ].includes(new URL(url).hostname);
   } catch {
     return false;
