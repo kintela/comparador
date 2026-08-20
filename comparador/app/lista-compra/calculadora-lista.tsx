@@ -640,7 +640,7 @@ export function CalculadoraLista() {
                 >
                   <option value="UD">ud.</option>
                   <option value="KG">kg</option>
-                  <option value="L">l</option>
+                  <option value="L">lt</option>
                 </select>
                 <button
                   type="button"

@@ -70,7 +70,7 @@ function esPrecioPorKilogramo(unidad: string | null) {
 function esPrecioPorLitro(unidad: string | null) {
   if (!unidad) return false;
   const normalizada = crearSlug(unidad).replaceAll("-", " ");
-  return normalizada === "l" || normalizada.includes("litro");
+  return ["l", "lt", "lts"].includes(normalizada) || normalizada.includes("litro");
 }
 
 function nombreIndicaPrecioPorKilogramo(nombreProducto: string | undefined) {
@@ -224,7 +224,7 @@ function volumenEnvaseL(nombreProducto: string | undefined): {
   if (!nombreProducto) return null;
   const nombre = nombreProducto.toLocaleLowerCase("es");
   const pack = nombre.match(
-    /(\d+)\s*(?:x|unidades?\s+de)\s*(\d+(?:[.,]\d+)?)\s*(ml|cl|l|litros?)\b/i,
+    /(\d+)\s*(?:x|unidades?\s+de)\s*(\d+(?:[.,]\d+)?)\s*(ml|cl|lts?|l|litros?)\b/i,
   );
   if (pack) {
     const unidades = Number(pack[1]);
@@ -235,13 +235,13 @@ function volumenEnvaseL(nombreProducto: string | undefined): {
     if (Number.isFinite(volumenL) && volumenL > 0) {
       return {
         volumenL,
-        texto: `${unidades} × ${cantidad.toLocaleString("es-ES")} ${unidad.startsWith("litro") ? "l" : unidad}`,
+        texto: `${unidades} × ${cantidad.toLocaleString("es-ES")} ${/^(?:l|lt|lts|litro)/.test(unidad) ? "lt" : unidad}`,
       };
     }
   }
 
   const cantidades = [
-    ...nombre.matchAll(/(\d+(?:[.,]\d+)?)\s*(ml|cl|l|litros?)\b/gi),
+    ...nombre.matchAll(/(\d+(?:[.,]\d+)?)\s*(ml|cl|lts?|l|litros?)\b/gi),
   ];
   const simple = cantidades.at(-1);
   if (!simple) return null;
@@ -252,7 +252,7 @@ function volumenEnvaseL(nombreProducto: string | undefined): {
   return Number.isFinite(volumenL) && volumenL > 0
     ? {
         volumenL,
-        texto: `${cantidad.toLocaleString("es-ES")} ${unidad.startsWith("litro") ? "l" : unidad}`,
+        texto: `${cantidad.toLocaleString("es-ES")} ${/^(?:l|lt|lts|litro)/.test(unidad) ? "lt" : unidad}`,
       }
     : null;
 }
@@ -283,7 +283,7 @@ export function calcularCosteArticulo({
   cantidadComparableTexto: string | null;
   cantidadEnvaseTexto: string | null;
   notaComparacion: string | null;
-  unidadComparable: "kg" | "l" | "ud." | null;
+  unidadComparable: "kg" | "lt" | "ud." | null;
 } {
   const comparable = referenciaComparacion ?? null;
   const pesoEnvase = pesoEnvaseKg(nombreProducto);
@@ -325,7 +325,7 @@ export function calcularCosteArticulo({
     const cantidadTotal = comparable.cantidadBase * cantidad;
     const cantidadComparableTexto =
       comparable.unidad !== "UD" && comparable.cantidadBase === 1000
-        ? `${cantidad.toLocaleString("es-ES", { maximumFractionDigits: 2 })} ${comparable.unidad.toLocaleLowerCase("es")}`
+        ? `${cantidad.toLocaleString("es-ES", { maximumFractionDigits: 2 })} ${comparable.unidad === "L" ? "lt" : "kg"}`
         : `${cantidadTotal.toLocaleString("es-ES")} ${comparable.unidadVisual}`;
     return {
       total: precioUnidadComparable * comparable.cantidad * cantidad,
@@ -340,7 +340,7 @@ export function calcularCosteArticulo({
       notaComparacion: null,
       unidadComparable: comparable.unidad === "UD"
         ? "ud."
-        : comparable.unidad.toLocaleLowerCase("es") as "kg" | "l",
+        : comparable.unidad === "L" ? "lt" : "kg",
     };
   }
 
@@ -390,7 +390,7 @@ export function etiquetaCantidadArticulo(
   unidadSolicitada: "UD" | "KG" | "L" = "UD",
 ) {
   if (unidadSolicitada === "KG") return "kg";
-  if (unidadSolicitada === "L") return "l";
+  if (unidadSolicitada === "L") return "lt";
   if (comparable) {
     return cantidad === 1
       ? `ración de ${comparable.cantidadBase} ${comparable.unidadVisual}`
