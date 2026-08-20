@@ -136,6 +136,10 @@ export function puntuacionRelevanciaProducto(
     /\b(raviolis?|tortellos?|tortellinis?|tortellonis?|cappellettis?|agnolottis?|panzerottis?|mezzelunas?|medialunas?|girasolis?|girasoles)\b/.test(
       nombre,
     );
+  const consultaEsRopaOscura = /\boscur[oa]s?\b/.test(consultaNormalizada);
+  const nombreEsRopaOscura = /\b(oscur[oa]s?|negr[oa]s?|black)\b/.test(
+    nombre,
+  );
 
   // En denominaciones con una calidad concreta no basta con que coincidan
   // "aceite" y "oliva": un aceite suave o intenso no es virgen extra.
@@ -155,6 +159,15 @@ export function puntuacionRelevanciaProducto(
   if (
     consultaEsPastaRellena &&
     !nombreEsPastaRellena
+  ) {
+    return 0;
+  }
+  if (/\bnorit\b/.test(consultaNormalizada) && !/\bnorit\b/.test(nombre)) {
+    return 0;
+  }
+  if (
+    consultaEsRopaOscura &&
+    !nombreEsRopaOscura
   ) {
     return 0;
   }
@@ -196,6 +209,14 @@ export function puntuacionRelevanciaProducto(
   }
 
   if (consultaEsPastaRellena && nombreEsPastaRellena) {
+    mejor = Math.max(mejor, 400);
+  }
+  if (
+    consultaEsRopaOscura &&
+    nombreEsRopaOscura &&
+    /\bnorit\b/.test(consultaNormalizada) &&
+    /\bnorit\b/.test(nombre)
+  ) {
     mejor = Math.max(mejor, 400);
   }
 
