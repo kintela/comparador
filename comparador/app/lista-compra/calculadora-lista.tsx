@@ -678,7 +678,7 @@ export function CalculadoraLista() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-[#17352b]/10 bg-white p-5 sm:p-7">
+      <section className="rounded-3xl border border-[#17352b]/10 bg-white p-4 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold">Productos de la lista</h2>
@@ -687,7 +687,7 @@ export function CalculadoraLista() {
             </p>
           </div>
           {articulos.length > 0 && (
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex w-full flex-wrap items-center justify-between gap-3 sm:w-auto sm:justify-start">
               <button
                 type="button"
                 onClick={() => void copiarEnlaceLista()}
@@ -729,86 +729,90 @@ export function CalculadoraLista() {
             {articulos.map((articulo, indice) => (
               <li
                 key={articulo.id}
-                className="flex items-center gap-3 rounded-2xl border border-[#17352b]/10 bg-[#f7f5ee]/70 p-3"
+                className="flex min-w-0 flex-col gap-3 rounded-2xl border border-[#17352b]/10 bg-[#f7f5ee]/70 p-3"
               >
-                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-sm font-extrabold text-[#176b50]">
-                  {indice + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold" title={articulo.termino}>
-                    {articulo.termino}
-                  </p>
-                  {articulo.unidadCantidad === "KG" ? (
-                    <p className="mt-0.5 text-xs text-[#71837c]">
-                      Cantidad solicitada por peso
-                    </p>
-                  ) : articulo.unidadCantidad === "L" ? (
-                    <p className="mt-0.5 text-xs text-[#71837c]">
-                      Cantidad solicitada por volumen
-                    </p>
-                  ) : obtenerPesoMedioPiezaKg(articulo.termino) !== null && (
-                    <p className="mt-0.5 text-xs text-[#71837c]">
-                      Por piezas · ≈{" "}
-                      {Math.round(
-                        (obtenerPesoMedioPiezaKg(articulo.termino) ?? 0) * 1000,
-                      )}{" "}
-                      g cada una
-                    </p>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center rounded-lg border border-[#17352b]/10 bg-white">
-                  <button
-                    type="button"
-                    onClick={() => cambiarCantidad(articulo.id, -1)}
-                    aria-label={`Reducir cantidad de ${articulo.termino}`}
-                    className="grid size-8 place-items-center text-lg text-[#60766e] hover:text-[#176b50]"
-                  >
-                    −
-                  </button>
-                  <span className="min-w-7 text-center text-sm font-extrabold">
-                    {cantidadTexto(articulo.cantidad)}
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-sm font-extrabold text-[#176b50]">
+                    {indice + 1}
                   </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-bold" title={articulo.termino}>
+                      {articulo.termino}
+                    </p>
+                    {articulo.unidadCantidad === "KG" ? (
+                      <p className="mt-0.5 text-xs text-[#71837c]">
+                        Cantidad solicitada por peso
+                      </p>
+                    ) : articulo.unidadCantidad === "L" ? (
+                      <p className="mt-0.5 text-xs text-[#71837c]">
+                        Cantidad solicitada por volumen
+                      </p>
+                    ) : obtenerPesoMedioPiezaKg(articulo.termino) !== null && (
+                      <p className="mt-0.5 text-xs text-[#71837c]">
+                        Por piezas · ≈{" "}
+                        {Math.round(
+                          (obtenerPesoMedioPiezaKg(articulo.termino) ?? 0) * 1000,
+                        )}{" "}
+                        g cada una
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex min-w-0 items-center justify-end gap-2 pl-12">
+                  <div className="flex shrink-0 items-center rounded-lg border border-[#17352b]/10 bg-white">
+                    <button
+                      type="button"
+                      onClick={() => cambiarCantidad(articulo.id, -1)}
+                      aria-label={`Reducir cantidad de ${articulo.termino}`}
+                      className="grid size-10 place-items-center text-lg text-[#60766e] hover:text-[#176b50] sm:size-8"
+                    >
+                      −
+                    </button>
+                    <span className="min-w-8 text-center text-sm font-extrabold">
+                      {cantidadTexto(articulo.cantidad)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => cambiarCantidad(articulo.id, 1)}
+                      aria-label={`Aumentar cantidad de ${articulo.termino}`}
+                      className="grid size-10 place-items-center text-lg text-[#60766e] hover:text-[#176b50] sm:size-8"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <select
+                    value={articulo.unidadCantidad}
+                    onChange={(evento) =>
+                      cambiarUnidadCantidad(
+                        articulo.id,
+                        evento.target.value === "KG"
+                          ? "KG"
+                          : evento.target.value === "L"
+                            ? "L"
+                            : "UD",
+                      )
+                    }
+                    aria-label={`Unidad de cantidad de ${articulo.termino}`}
+                    className="h-10 min-w-16 rounded-lg border border-[#17352b]/10 bg-white px-2 text-sm font-bold text-[#17352b] outline-none focus:border-[#176b50] sm:h-8"
+                  >
+                    <option value="UD">ud.</option>
+                    <option value="KG">kg</option>
+                    <option value="L">lt</option>
+                  </select>
                   <button
                     type="button"
-                    onClick={() => cambiarCantidad(articulo.id, 1)}
-                    aria-label={`Aumentar cantidad de ${articulo.termino}`}
-                    className="grid size-8 place-items-center text-lg text-[#60766e] hover:text-[#176b50]"
+                    onClick={() => {
+                      setArticulos((actuales) =>
+                        actuales.filter((item) => item.id !== articulo.id),
+                      );
+                      setResultados(null);
+                    }}
+                    aria-label={`Eliminar ${articulo.termino}`}
+                    className="grid size-10 shrink-0 place-items-center rounded-lg text-[#8c9a95] hover:bg-red-50 hover:text-red-600 sm:size-8"
                   >
-                    +
+                    ×
                   </button>
                 </div>
-                <select
-                  value={articulo.unidadCantidad}
-                  onChange={(evento) =>
-                    cambiarUnidadCantidad(
-                      articulo.id,
-                      evento.target.value === "KG"
-                        ? "KG"
-                        : evento.target.value === "L"
-                          ? "L"
-                          : "UD",
-                    )
-                  }
-                  aria-label={`Unidad de cantidad de ${articulo.termino}`}
-                  className="h-8 rounded-lg border border-[#17352b]/10 bg-white px-2 text-sm font-bold text-[#17352b] outline-none focus:border-[#176b50]"
-                >
-                  <option value="UD">ud.</option>
-                  <option value="KG">kg</option>
-                  <option value="L">lt</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setArticulos((actuales) =>
-                      actuales.filter((item) => item.id !== articulo.id),
-                    );
-                    setResultados(null);
-                  }}
-                  aria-label={`Eliminar ${articulo.termino}`}
-                  className="grid size-8 shrink-0 place-items-center rounded-lg text-[#8c9a95] hover:bg-red-50 hover:text-red-600"
-                >
-                  ×
-                </button>
               </li>
             ))}
           </ul>
@@ -897,8 +901,8 @@ function TablaComparacion({
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-[#17352b]/10 bg-white shadow-[0_18px_55px_rgba(23,53,43,0.08)]">
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#17352b]/10 px-5 py-6 sm:px-7">
+    <section className="-mx-5 overflow-hidden border-y border-[#17352b]/10 bg-white shadow-[0_18px_55px_rgba(23,53,43,0.08)] sm:mx-0 sm:rounded-3xl sm:border">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#17352b]/10 px-4 py-5 sm:px-7 sm:py-6">
         <div>
           <p className="text-sm font-semibold text-[#16805e]">Comparación</p>
           <h2 className="mt-1 text-2xl font-bold">Precio de tu lista</h2>
@@ -908,7 +912,7 @@ function TablaComparacion({
           </p>
         </div>
         {completas.length > 0 ? (
-          <div className="rounded-2xl bg-[#e7f5ee] px-5 py-3 text-right">
+          <div className="w-full rounded-2xl bg-[#e7f5ee] px-5 py-3 text-right sm:w-auto">
             <p className="text-xs font-bold uppercase tracking-wide text-[#16805e]">
               {usaCantidadesComparables
                 ? "Mejor total comparable"
@@ -936,8 +940,8 @@ function TablaComparacion({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#17352b]/10 bg-[#f7f5ee]/70 px-5 py-3 sm:px-7">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#17352b]/10 bg-[#f7f5ee]/70 px-4 py-3 sm:px-7">
+        <div className="w-full sm:w-auto">
           <p className="text-xs font-semibold text-[#60766e]">
             Desplázate horizontalmente para ver todos los supermercados
           </p>
@@ -951,13 +955,13 @@ function TablaComparacion({
             </button>
           )}
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end">
           <button
             type="button"
             onClick={() => setSoloCestasCompletas((actual) => !actual)}
             disabled={numeroCestasCompletas === 0}
             aria-pressed={soloCestasCompletas}
-            className={`inline-flex min-h-9 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+            className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-9 sm:flex-none ${
               soloCestasCompletas
                 ? "border-[#176b50] bg-[#176b50] text-white"
                 : "border-[#17352b]/15 bg-white text-[#17352b] hover:border-[#176b50]/40 hover:bg-[#e7f5ee]"
@@ -996,18 +1000,18 @@ function TablaComparacion({
 
       <div
         ref={contenedorTabla}
-        className="scrollbar-tabla max-h-[70vh] overflow-auto overscroll-contain"
+        className="scrollbar-tabla max-h-[75svh] overflow-auto overscroll-contain sm:max-h-[70vh]"
         tabIndex={0}
         aria-label="Tabla comparativa desplazable horizontal y verticalmente"
       >
         <table className="w-max min-w-full border-collapse text-left">
           <thead>
             <tr className="bg-[#f7f5ee]">
-              <th className="sticky left-0 top-0 z-40 min-w-56 border-b border-r border-[#17352b]/10 bg-[#f7f5ee] px-5 py-4 text-sm font-bold shadow-[0_1px_0_rgba(23,53,43,0.1)]">
+              <th className="sticky left-0 top-0 z-40 w-28 min-w-28 max-w-28 border-b border-r border-[#17352b]/10 bg-[#f7f5ee] px-3 py-3 text-xs font-bold shadow-[0_1px_0_rgba(23,53,43,0.1)] sm:w-56 sm:min-w-56 sm:max-w-56 sm:px-5 sm:py-4 sm:text-sm">
                 Producto
               </th>
               {visibles.map((supermercado) => (
-                <th key={supermercado} className="sticky top-0 z-30 min-w-40 border-b border-[#17352b]/10 bg-[#f7f5ee] px-4 py-4 text-center text-sm font-bold shadow-[0_1px_0_rgba(23,53,43,0.1)]">
+                <th key={supermercado} className="sticky top-0 z-30 min-w-36 border-b border-[#17352b]/10 bg-[#f7f5ee] px-3 py-3 text-center text-xs font-bold shadow-[0_1px_0_rgba(23,53,43,0.1)] sm:min-w-40 sm:px-4 sm:py-4 sm:text-sm">
                   <div className="flex items-center justify-center gap-2">
                     <span>{supermercado}</span>
                     <button
@@ -1057,8 +1061,8 @@ function TablaComparacion({
               );
               return (
                 <tr key={articulo.id} className="border-b border-[#17352b]/8 last:border-b-0">
-                  <th className="sticky left-0 z-10 border-r border-[#17352b]/10 bg-white px-5 py-4 align-top">
-                    <p className="font-bold">{articulo.termino}</p>
+                  <th className="sticky left-0 z-10 w-28 min-w-28 max-w-28 border-r border-[#17352b]/10 bg-white px-3 py-3 align-top sm:w-56 sm:min-w-56 sm:max-w-56 sm:px-5 sm:py-4">
+                    <p className="break-words text-sm font-bold sm:text-base">{articulo.termino}</p>
                     <p className="mt-1 text-xs font-medium text-[#71837c]">
                       {cantidadTexto(articulo.cantidad)}{" "}
                       {etiquetaCantidadArticulo(
@@ -1080,7 +1084,7 @@ function TablaComparacion({
                     return (
                       <td
                         key={supermercado}
-                        className={`px-4 py-4 text-center align-top transition-colors ${
+                        className={`px-3 py-3 text-center align-top transition-colors sm:px-4 sm:py-4 ${
                           masBarato
                             ? "bg-[#fff9df] shadow-[inset_0_0_0_2px_#f4c95d]"
                             : ""
@@ -1098,7 +1102,7 @@ function TablaComparacion({
                                 href={precio.urlProducto ?? precio.imagenProducto}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="relative mx-auto mb-3 block size-20 overflow-hidden rounded-xl bg-[#f7f5ee]"
+                                className="relative mx-auto mb-3 block size-16 overflow-hidden rounded-xl bg-[#f7f5ee] sm:size-20"
                                 aria-label={`Ver ${precio.nombreProducto}`}
                               >
                                 <Image
@@ -1108,18 +1112,18 @@ function TablaComparacion({
                                   unoptimized={requiereCargaDirecta(
                                     precio.imagenProducto,
                                   )}
-                                  sizes="80px"
+                                  sizes="(max-width: 639px) 64px, 80px"
                                   className="object-contain p-1.5"
                                 />
                               </a>
                             )}
                             {precio.urlProducto ? (
-                              <a href={precio.urlProducto} target="_blank" rel="noreferrer" className="text-lg font-extrabold text-[#176b50] hover:underline">
+                              <a href={precio.urlProducto} target="_blank" rel="noreferrer" className="text-base font-extrabold text-[#176b50] hover:underline sm:text-lg">
                                 {calculo?.estimado ? "≈ " : ""}
                                 {moneda(calculo?.total ?? 0)}
                               </a>
                             ) : (
-                              <p className="text-lg font-extrabold text-[#176b50]">
+                              <p className="text-base font-extrabold text-[#176b50] sm:text-lg">
                                 {calculo?.estimado ? "≈ " : ""}
                                 {moneda(calculo?.total ?? 0)}
                               </p>
@@ -1190,18 +1194,18 @@ function TablaComparacion({
           </tbody>
           <tfoot>
             <tr className="bg-[#17352b] text-white">
-              <th className="sticky bottom-0 left-0 z-40 border-r border-t border-white/10 bg-[#17352b] px-5 py-5 shadow-[0_-1px_0_rgba(255,255,255,0.12)]">
-                <p className="text-lg font-extrabold">Total</p>
-                <p className="mt-1 text-xs font-medium text-white/60">Solo se comparan cestas completas</p>
+              <th className="sticky bottom-0 left-0 z-40 w-28 min-w-28 max-w-28 border-r border-t border-white/10 bg-[#17352b] px-3 py-4 shadow-[0_-1px_0_rgba(255,255,255,0.12)] sm:w-56 sm:min-w-56 sm:max-w-56 sm:px-5 sm:py-5">
+                <p className="text-base font-extrabold sm:text-lg">Total</p>
+                <p className="mt-1 text-[10px] font-medium leading-4 text-white/60 sm:text-xs">Solo se comparan cestas completas</p>
               </th>
               {totalesVisibles.map((total) => {
                 const ganadora = total.completa && total.total === totalMasBarato;
                 return (
-                  <td key={total.supermercado} className={`sticky bottom-0 z-30 border-t border-white/10 px-4 py-5 text-center shadow-[0_-1px_0_rgba(255,255,255,0.12)] ${ganadora ? "bg-[#176b50]" : "bg-[#17352b]"}`}>
+                  <td key={total.supermercado} className={`sticky bottom-0 z-30 border-t border-white/10 px-3 py-4 text-center shadow-[0_-1px_0_rgba(255,255,255,0.12)] sm:px-4 sm:py-5 ${ganadora ? "bg-[#176b50]" : "bg-[#17352b]"}`}>
                     {total.encontrados > 0 ? (
                       <>
                         {ganadora && <span className="mb-2 inline-block rounded-full bg-[#f4c95d] px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#17352b]">Más barato</span>}
-                        <p className="text-xl font-extrabold">
+                        <p className="text-lg font-extrabold sm:text-xl">
                           {total.estimado ? "≈ " : ""}
                           {moneda(total.total)}
                         </p>
