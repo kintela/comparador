@@ -70,6 +70,25 @@ const COLUMNAS_RESULTADOS = {
 } as const;
 
 type NumeroColumnas = keyof typeof COLUMNAS_RESULTADOS;
+type OrdenResultados =
+  | "relevancia"
+  | "precio-asc"
+  | "precio-desc"
+  | "supermercado-asc"
+  | "supermercado-desc";
+
+const COMPARADOR_TEXTO = new Intl.Collator("es", {
+  sensitivity: "base",
+  numeric: true,
+});
+
+function obtenerOfertaMasBarata(producto: Producto) {
+  return producto.ofertas.reduce<Oferta | null>(
+    (masBarata, oferta) =>
+      !masBarata || oferta.precio < masBarata.precio ? oferta : masBarata,
+    null,
+  );
+}
 
 function requiereCargaDirecta(url: string) {
   if (
@@ -99,19 +118,44 @@ export function BuscadorProductos() {
   const [buscando, setBuscando] = useState(false);
   const [resultado, setResultado] = useState<RespuestaBusqueda | null>(null);
   const [numeroColumnas, setNumeroColumnas] = useState<NumeroColumnas>(3);
+  const [ordenResultados, setOrdenResultados] =
+    useState<OrdenResultados>("relevancia");
   const [supermercadosSeleccionados, setSupermercadosSeleccionados] = useState<
     string[]
   >([...SUPERMERCADOS]);
   const productosOrdenados = [...(resultado?.productos ?? [])].sort((a, b) => {
+    const ofertaA = obtenerOfertaMasBarata(a);
+    const ofertaB = obtenerOfertaMasBarata(b);
+    const precioA = ofertaA?.precio ?? Number.POSITIVE_INFINITY;
+    const precioB = ofertaB?.precio ?? Number.POSITIVE_INFINITY;
+
+    if (ordenResultados === "precio-asc") {
+      return precioA - precioB || COMPARADOR_TEXTO.compare(a.nombre, b.nombre);
+    }
+    if (ordenResultados === "precio-desc") {
+      return precioB - precioA || COMPARADOR_TEXTO.compare(a.nombre, b.nombre);
+    }
+    if (
+      ordenResultados === "supermercado-asc" ||
+      ordenResultados === "supermercado-desc"
+    ) {
+      const direccion = ordenResultados === "supermercado-asc" ? 1 : -1;
+      return (
+        direccion *
+          COMPARADOR_TEXTO.compare(
+            ofertaA?.supermercado ?? "",
+            ofertaB?.supermercado ?? "",
+          ) ||
+        precioA - precioB ||
+        COMPARADOR_TEXTO.compare(a.nombre, b.nombre)
+      );
+    }
+
     const termino = resultado?.consulta ?? consulta;
     const diferenciaRelevancia =
       puntuacionRelevanciaProducto(b.nombre, termino) -
       puntuacionRelevanciaProducto(a.nombre, termino);
-    return (
-      diferenciaRelevancia ||
-      Math.min(...a.ofertas.map((oferta) => oferta.precio)) -
-        Math.min(...b.ofertas.map((oferta) => oferta.precio))
-    );
+    return diferenciaRelevancia || precioA - precioB;
   });
 
   async function buscar(
@@ -337,41 +381,59 @@ export function BuscadorProductos() {
                     : `${resultado.total} productos para “${resultado.consulta}”`}
                 </h2>
               </div>
-              <div
-                className="flex items-center gap-1 rounded-xl border border-[#17352b]/10 bg-white p-1 shadow-sm"
-                aria-label="Fichas por fila"
-              >
-                <span
-                  className="grid size-9 place-items-center text-[#71837c]"
-                  title="Fichas por fila"
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <label className="flex h-12 items-center gap-2 rounded-xl border border-[#17352b]/10 bg-white px-3 text-sm shadow-sm">
+                  <span className="font-semibold text-[#60766e]">Ordenar por</span>
+                  <select
+                    value={ordenResultados}
+                    onChange={(evento) =>
+                      setOrdenResultados(evento.target.value as OrdenResultados)
+                    }
+                    className="min-w-40 cursor-pointer bg-transparent font-bold text-[#17352b] outline-none"
+                  >
+                    <option value="relevancia">Relevancia</option>
+                    <option value="precio-asc">Precio: menor a mayor</option>
+                    <option value="precio-desc">Precio: mayor a menor</option>
+                    <option value="supermercado-asc">Supermercado: A-Z</option>
+                    <option value="supermercado-desc">Supermercado: Z-A</option>
+                  </select>
+                </label>
+                <div
+                  className="flex items-center gap-1 rounded-xl border border-[#17352b]/10 bg-white p-1 shadow-sm"
+                  aria-label="Fichas por fila"
                 >
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    className="size-5 fill-none stroke-current stroke-2"
+                  <span
+                    className="grid size-9 place-items-center text-[#71837c]"
+                    title="Fichas por fila"
                   >
-                    <rect x="3" y="3" width="7" height="7" rx="1" />
-                    <rect x="14" y="3" width="7" height="7" rx="1" />
-                    <rect x="3" y="14" width="7" height="7" rx="1" />
-                    <rect x="14" y="14" width="7" height="7" rx="1" />
-                  </svg>
-                </span>
-                {([3, 4, 5] as const).map((columnas) => (
-                  <button
-                    key={columnas}
-                    type="button"
-                    onClick={() => setNumeroColumnas(columnas)}
-                    aria-label={`Mostrar ${columnas} fichas por fila`}
-                    aria-pressed={numeroColumnas === columnas}
-                    className={`grid size-9 place-items-center rounded-lg text-sm font-bold transition ${
-                      numeroColumnas === columnas
-                        ? "bg-[#176b50] text-white"
-                        : "text-[#60766e] hover:bg-[#17352b]/5 hover:text-[#176b50]"
-                    }`}
-                  >
-                    {columnas}
-                  </button>
-                ))}
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className="size-5 fill-none stroke-current stroke-2"
+                    >
+                      <rect x="3" y="3" width="7" height="7" rx="1" />
+                      <rect x="14" y="3" width="7" height="7" rx="1" />
+                      <rect x="3" y="14" width="7" height="7" rx="1" />
+                      <rect x="14" y="14" width="7" height="7" rx="1" />
+                    </svg>
+                  </span>
+                  {([3, 4, 5] as const).map((columnas) => (
+                    <button
+                      key={columnas}
+                      type="button"
+                      onClick={() => setNumeroColumnas(columnas)}
+                      aria-label={`Mostrar ${columnas} fichas por fila`}
+                      aria-pressed={numeroColumnas === columnas}
+                      className={`grid size-9 place-items-center rounded-lg text-sm font-bold transition ${
+                        numeroColumnas === columnas
+                          ? "bg-[#176b50] text-white"
+                          : "text-[#60766e] hover:bg-[#17352b]/5 hover:text-[#176b50]"
+                      }`}
+                    >
+                      {columnas}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
