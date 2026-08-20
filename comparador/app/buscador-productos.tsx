@@ -391,7 +391,7 @@ export function BuscadorProductos() {
                     }
                     className="min-w-40 cursor-pointer bg-transparent font-bold text-[#17352b] outline-none"
                   >
-                    <option value="relevancia">Relevancia</option>
+                    <option value="relevancia">Mejor coincidencia</option>
                     <option value="precio-asc">Precio: menor a mayor</option>
                     <option value="precio-desc">Precio: mayor a menor</option>
                     <option value="supermercado-asc">Supermercado: A-Z</option>
