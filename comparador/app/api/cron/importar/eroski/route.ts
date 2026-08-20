@@ -15,6 +15,7 @@ import {
   obtenerSolicitudesAutomaticas,
   registrarResultadoSolicitudAutomatica,
 } from "@/servicios/solicitudes-rastreo/automatico";
+import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,27 @@ async function obtenerConsultas() {
 export async function GET(request: Request) {
   const respuestaAutorizacion = autorizarCron(request);
   if (respuestaAutorizacion) return respuestaAutorizacion;
-  return Response.json({ consultas: await obtenerConsultas() });
+  const supabase = obtenerSupabaseServidor();
+  const { data: cadena } = await supabase
+    .from("cadenas_supermercados")
+    .select("id")
+    .eq("slug", "eroski")
+    .maybeSingle();
+  const { data: ultimaEjecucion } = cadena
+    ? await supabase
+        .from("ejecuciones_rastreo")
+        .select("fecha_inicio")
+        .eq("cadena_supermercado_id", cadena.id)
+        .eq("tipo_rastreo", "automatico")
+        .eq("estado", "completado")
+        .order("fecha_inicio", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+  return Response.json({
+    consultas: await obtenerConsultas(),
+    ultimaEjecucion: ultimaEjecucion?.fecha_inicio ?? null,
+  });
 }
 
 type CargaEroski = {
