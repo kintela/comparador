@@ -26,20 +26,6 @@ let origenActivoEroski: string | null = null;
 let origenDescartadoEroski: string | null = null;
 let inicioSesionEroski: Promise<string> | null = null;
 
-async function fetchEroskiDesdeEdge(url: URL) {
-  const hostAplicacion =
-    process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
-  const secreto = process.env.CRON_SECRET?.trim();
-  if (!hostAplicacion || !secreto) return null;
-  const proxy = new URL(`https://${hostAplicacion}/api/interno/eroski`);
-  proxy.searchParams.set("url", url.toString());
-  return fetch(proxy, {
-    cache: "no-store",
-    headers: { "x-internal-secret": secreto },
-    signal: AbortSignal.timeout(45_000),
-  });
-}
-
 function iniciarSesionEroski() {
   inicioSesionEroski ??= (async () => {
     let ultimoEstado = 0;
@@ -115,21 +101,13 @@ export async function rastrearProductosEroski(
       const urlPeticion = new URL(urlOrigen);
       urlPeticion.hostname = new URL(origenPeticiones).hostname;
       if (intento > 1) urlPeticion.searchParams.set("_intento", String(intento));
-      let respuesta: {
-        ok: boolean;
-        status: number;
-        text: () => Promise<string>;
-      } = await fetchComoNavegador(urlPeticion, {
+      const respuesta = await fetchComoNavegador(urlPeticion, {
         headers: {
           Accept: "text/html,application/xhtml+xml",
           "Accept-Language": "es-ES,es;q=0.9",
           Referer: `${origenPeticiones}/es/`,
         },
       });
-
-      if (!respuesta.ok && respuesta.status === 403) {
-        respuesta = (await fetchEroskiDesdeEdge(urlPeticion)) ?? respuesta;
-      }
 
       if (!respuesta.ok) {
         if (respuesta.status === 403) {
