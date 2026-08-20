@@ -97,6 +97,7 @@ const SUPERMERCADOS = [
 const CLAVE_LISTA = "comparador-lista-compra-v1";
 const PARAMETRO_LISTA_COMPARTIDA = "lista";
 const URL_PUBLICA_LISTA = "https://comparador.kintela.es/lista-compra";
+const PATRON_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const REFERENCIA_UN_KILO: ReferenciaComparacion = {
   cantidad: 1,
   unidad: "KG",
@@ -904,6 +905,9 @@ function TablaComparacion({
     tipo: "error" | "exito";
     mensaje: string;
   } | null>(null);
+  const destinatarioCorreoValido = PATRON_CORREO.test(
+    destinatarioCorreo.trim(),
+  );
   const ordenOriginal = new Map<string, number>(
     SUPERMERCADOS.map((supermercado, indice) => [supermercado, indice]),
   );
@@ -1012,6 +1016,7 @@ function TablaComparacion({
 
   async function enviarListaPorCorreo(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
+    if (!destinatarioCorreoValido) return;
     setEnviandoCorreo(true);
     setEstadoCorreo(null);
     try {
@@ -1442,8 +1447,28 @@ function TablaComparacion({
                 }}
                 placeholder="nombre@ejemplo.com"
                 disabled={enviandoCorreo}
-                className="mt-2 h-12 w-full rounded-xl border border-[#17352b]/20 bg-white px-4 text-base outline-none transition focus:border-[#176b50] focus:ring-4 focus:ring-[#176b50]/10 disabled:bg-[#f7f5ee]"
+                aria-invalid={
+                  destinatarioCorreo.length > 0 && !destinatarioCorreoValido
+                }
+                aria-describedby={
+                  destinatarioCorreo.length > 0 && !destinatarioCorreoValido
+                    ? "error-destinatario-lista"
+                    : undefined
+                }
+                className={`mt-2 h-12 w-full rounded-xl border bg-white px-4 text-base outline-none transition disabled:bg-[#f7f5ee] ${
+                  destinatarioCorreo.length > 0 && !destinatarioCorreoValido
+                    ? "border-red-400 focus:border-red-500 focus:ring-4 focus:ring-red-100"
+                    : "border-[#17352b]/20 focus:border-[#176b50] focus:ring-4 focus:ring-[#176b50]/10"
+                }`}
               />
+              {destinatarioCorreo.length > 0 && !destinatarioCorreoValido && (
+                <p
+                  id="error-destinatario-lista"
+                  className="mt-2 text-sm font-semibold text-red-700"
+                >
+                  Introduce una dirección válida, por ejemplo nombre@dominio.com.
+                </p>
+              )}
               {estadoCorreo && (
                 <p
                   role="status"
@@ -1468,7 +1493,7 @@ function TablaComparacion({
                 {estadoCorreo?.tipo !== "exito" && (
                   <button
                     type="submit"
-                    disabled={enviandoCorreo || destinatarioCorreo.trim().length === 0}
+                    disabled={enviandoCorreo || !destinatarioCorreoValido}
                     className="h-11 rounded-xl bg-[#176b50] px-5 text-sm font-bold text-white transition hover:bg-[#125d45] disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     {enviandoCorreo ? "Enviando…" : "Enviar lista"}
