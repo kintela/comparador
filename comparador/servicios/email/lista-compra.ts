@@ -3,6 +3,7 @@ import "server-only";
 export type CeldaListaCorreo = {
   supermercado: string;
   nombreProducto: string;
+  imagenProducto: string | null;
   total: number;
   estimado: boolean;
   detalles: string[];
@@ -124,9 +125,15 @@ export function validarListaCompraCorreo(valor: unknown): ListaCompraCorreo | nu
       const urlProducto =
         celda.urlProducto === null ? null : enlaceSeguro(celda.urlProducto);
       if (celda.urlProducto !== null && !urlProducto) return null;
+      const imagenProducto =
+        celda.imagenProducto == null
+          ? null
+          : enlaceSeguro(celda.imagenProducto);
+      if (celda.imagenProducto != null && !imagenProducto) return null;
       celdas.push({
         supermercado,
         nombreProducto,
+        imagenProducto,
         total: celda.total,
         estimado: celda.estimado,
         detalles: detalles as string[],
@@ -190,7 +197,11 @@ export function crearCorreoListaCompra(lista: ListaCompraCorreo) {
           const nombre = celda.urlProducto
             ? `<a href="${escaparHtml(celda.urlProducto)}" style="color:#176b50;text-decoration:underline">${escaparHtml(celda.nombreProducto)}</a>`
             : escaparHtml(celda.nombreProducto);
+          const imagen = celda.imagenProducto
+            ? `${celda.urlProducto ? `<a href="${escaparHtml(celda.urlProducto)}" style="display:inline-block;text-decoration:none">` : ""}<img src="${escaparHtml(celda.imagenProducto)}" alt="${escaparHtml(celda.nombreProducto)}" width="80" height="80" style="display:block;width:80px;height:80px;margin:0 auto 10px;border:0;border-radius:10px;background:#f7f5ee;object-fit:contain" />${celda.urlProducto ? "</a>" : ""}`
+            : "";
           return `<td style="min-width:150px;padding:14px;border:1px solid #dfe5e2;text-align:center;vertical-align:top">
+            ${imagen}
             <strong style="display:block;color:#176b50;font-size:17px">${celda.estimado ? "≈ " : ""}${moneda(celda.total)}</strong>
             ${detalles}
             <div style="margin-top:8px;color:#445951;font-size:12px;line-height:1.4">${nombre}</div>
@@ -236,7 +247,10 @@ export function crearCorreoListaCompra(lista: ListaCompraCorreo) {
             <tfoot><tr><th style="padding:14px;border:1px solid #315047;background:#17352b;color:#fff;text-align:left;font-size:18px">Total</th>${totales}</tr></tfoot>
           </table>
         </div>
-        <p style="margin:0;padding:18px 24px;color:#71837c;font-size:12px;line-height:1.5">Los precios proceden de los últimos datos disponibles y pueden variar en tienda.</p>
+        <div style="padding:20px 24px;text-align:center">
+          <p style="margin:0 0 14px;color:#71837c;font-size:12px;line-height:1.5">Los precios proceden de los últimos datos disponibles y pueden variar en tienda.</p>
+          <a href="https://comparador.kintela.es" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#176b50;color:#fff;font-size:14px;font-weight:bold;text-decoration:none">Abrir Comparador de precios</a>
+        </div>
       </div>
     </div>
   </body></html>`;
@@ -261,6 +275,7 @@ export function crearCorreoListaCompra(lista: ListaCompraCorreo) {
     ),
     "",
     "Los precios pueden variar en tienda.",
+    "Consulta el comparador: https://comparador.kintela.es",
   ].join("\n");
 
   return { html, texto };

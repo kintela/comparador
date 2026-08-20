@@ -97,6 +97,7 @@ const SUPERMERCADOS = [
 
 const CLAVE_LISTA = "comparador-lista-compra-v1";
 const PARAMETRO_LISTA_COMPARTIDA = "lista";
+const URL_PUBLICA = "https://comparador.kintela.es";
 const URL_PUBLICA_LISTA = "https://comparador.kintela.es/lista-compra";
 const REFERENCIA_UN_KILO: ReferenciaComparacion = {
   cantidad: 1,
@@ -113,6 +114,15 @@ const REFERENCIA_UN_LITRO: ReferenciaComparacion = {
 
 function crearId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+}
+
+function crearUrlPublicaRecurso(valor: string | null) {
+  if (!valor) return null;
+  try {
+    return new URL(valor, URL_PUBLICA).toString();
+  } catch {
+    return null;
+  }
 }
 
 function codificarListaCompartida(articulos: ArticuloLista[]) {
@@ -992,6 +1002,7 @@ function TablaComparacion({
         return {
           supermercado,
           nombreProducto: precio.nombreProducto,
+          imagenProducto: crearUrlPublicaRecurso(precio.imagenProducto),
           total: calculo.total,
           estimado: calculo.estimado,
           detalles,
