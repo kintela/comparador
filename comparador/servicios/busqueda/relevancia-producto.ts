@@ -128,6 +128,16 @@ export function puntuacionRelevanciaProducto(
 ) {
   const nombre = normalizar(nombreProducto);
   const consultaNormalizada = normalizar(consulta);
+
+  // En denominaciones con una calidad concreta no basta con que coincidan
+  // "aceite" y "oliva": un aceite suave o intenso no es virgen extra.
+  if (
+    /\bvirgen extra\b/.test(consultaNormalizada) &&
+    !/\bvirgen extra\b/.test(nombre)
+  ) {
+    return 0;
+  }
+
   let mejor = 0;
   let comienzaPorConsulta = false;
   const variantes = variantesConsulta(consulta);
