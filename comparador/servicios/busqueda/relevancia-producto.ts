@@ -147,8 +147,11 @@ export function puntuacionRelevanciaProducto(
   if (
     /\bpastas?\b/.test(consultaNormalizada) &&
     /\brellen[oa]s?\b/.test(consultaNormalizada) &&
-    !/\b(rellen[oa]s?|raviolis?|tortellinis?|tortellonis?|cappellettis?|agnolottis?|panzerottis?|mezzelunas?|girasolis?)\b/.test(
-      nombre,
+    !(
+      /\bpastas?\b.*\brellen[oa]s?\b/.test(nombre) ||
+      /\b(raviolis?|tortellos?|tortellinis?|tortellonis?|cappellettis?|agnolottis?|panzerottis?|mezzelunas?|medialunas?|girasolis?|girasoles)\b/.test(
+        nombre,
+      )
     )
   ) {
     return 0;
