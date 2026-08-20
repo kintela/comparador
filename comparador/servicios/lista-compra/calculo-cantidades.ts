@@ -324,8 +324,8 @@ export function calcularCosteArticulo({
   if (comparable && precioUnidadComparable !== null) {
     const cantidadTotal = comparable.cantidadBase * cantidad;
     const cantidadComparableTexto =
-      comparable.unidad === "KG" && comparable.cantidadBase === 1000
-        ? `${cantidad.toLocaleString("es-ES", { maximumFractionDigits: 2 })} kg`
+      comparable.unidad !== "UD" && comparable.cantidadBase === 1000
+        ? `${cantidad.toLocaleString("es-ES", { maximumFractionDigits: 2 })} ${comparable.unidad.toLocaleLowerCase("es")}`
         : `${cantidadTotal.toLocaleString("es-ES")} ${comparable.unidadVisual}`;
     return {
       total: precioUnidadComparable * comparable.cantidad * cantidad,
@@ -387,9 +387,10 @@ export function etiquetaCantidadArticulo(
   consulta: string,
   cantidad: number,
   comparable?: ReferenciaComparacion | null,
-  unidadSolicitada: "UD" | "KG" = "UD",
+  unidadSolicitada: "UD" | "KG" | "L" = "UD",
 ) {
   if (unidadSolicitada === "KG") return "kg";
+  if (unidadSolicitada === "L") return "l";
   if (comparable) {
     return cantidad === 1
       ? `ración de ${comparable.cantidadBase} ${comparable.unidadVisual}`
