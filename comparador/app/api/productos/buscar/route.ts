@@ -59,6 +59,15 @@ type CadenaSeleccionada = {
   nombre: string;
 };
 
+const TAMANO_LOTE_IDS = 100;
+
+function dividirEnLotes<T>(elementos: T[], tamano = TAMANO_LOTE_IDS) {
+  return Array.from(
+    { length: Math.ceil(elementos.length / tamano) },
+    (_, indice) => elementos.slice(indice * tamano, (indice + 1) * tamano),
+  );
+}
+
 function imagenCarrefourConVersion(url: string | null, ean: string | null) {
   return ean
     ? `/api/imagenes/carrefour?ean=${encodeURIComponent(ean)}&v=3`
@@ -226,6 +235,21 @@ export async function GET(request: Request) {
       return consultaProductos;
     }
 
+    async function consultarProductosPorIds(
+      idsProductos: string[],
+      idsFiltro = idsCadenas,
+    ) {
+      const resultados = await Promise.all(
+        dividirEnLotes(idsProductos).map((idsLote) =>
+          crearConsultaProductos(idsFiltro).in("id", idsLote),
+        ),
+      );
+      return resultados.flatMap((resultado) => {
+        if (resultado.error) throw resultado.error;
+        return resultado.data ?? [];
+      });
+    }
+
     async function buscarIdsCoincidentes({
       variante,
       cadenas,
@@ -292,12 +316,10 @@ export async function GET(request: Request) {
           ),
         });
         if (idsCoincidentes.length === 0) continue;
-        const resultado = await crearConsultaProductos().in(
-          "id",
+        const productosCoincidentes = await consultarProductosPorIds(
           idsCoincidentes,
         );
-        if (resultado.error) throw resultado.error;
-        for (const producto of (resultado.data ?? []) as Array<{ id: string }>) {
+        for (const producto of productosCoincidentes as Array<{ id: string }>) {
           productosPorId.set(producto.id, producto);
         }
       }
@@ -328,12 +350,11 @@ export async function GET(request: Request) {
               });
               if (idsCoincidentes.length === 0) continue;
 
-              const resultado = await crearConsultaProductos([cadena.id]).in(
-                "id",
+              const productosCoincidentes = await consultarProductosPorIds(
                 idsCoincidentes,
+                [cadena.id],
               );
-              if (resultado.error) throw resultado.error;
-              for (const producto of (resultado.data ?? []) as Array<{
+              for (const producto of productosCoincidentes as Array<{
                 id: string;
               }>) {
                 productosCadena.set(producto.id, producto);
@@ -352,11 +373,9 @@ export async function GET(request: Request) {
         data = [...productosUnicos.values()];
       }
     } else {
-      const resultado = await crearConsultaProductos()
-        .in("id", idsConPromocion ?? [])
-        .limit(200);
-      if (resultado.error) throw resultado.error;
-      data = resultado.data ?? [];
+      data = (
+        await consultarProductosPorIds(idsConPromocion ?? [])
+      ).slice(0, 200);
     }
 
     const productosSupermercado =
@@ -372,15 +391,21 @@ export async function GET(request: Request) {
     }
 
     const ids = productosSupermercado.map((producto) => producto.id);
-    const { data: datosPrecios, error: errorPrecios } = await supabase
-      .from("precios")
-      .select(
-        "producto_supermercado_id, precio, precio_promocional, precio_referencia, unidad_referencia, texto_promocion, fecha_inicio_promocion, fecha_fin_promocion, disponible, fecha_obtencion, tiendas(id, nombre, municipio)",
-      )
-      .in("producto_supermercado_id", ids)
-      .order("fecha_obtencion", { ascending: false });
-
-    if (errorPrecios) throw errorPrecios;
+    const resultadosPrecios = await Promise.all(
+      dividirEnLotes(ids).map((idsLote) =>
+        supabase
+          .from("precios")
+          .select(
+            "producto_supermercado_id, precio, precio_promocional, precio_referencia, unidad_referencia, texto_promocion, fecha_inicio_promocion, fecha_fin_promocion, disponible, fecha_obtencion, tiendas(id, nombre, municipio)",
+          )
+          .in("producto_supermercado_id", idsLote)
+          .order("fecha_obtencion", { ascending: false }),
+      ),
+    );
+    const datosPrecios = resultadosPrecios.flatMap((resultado) => {
+      if (resultado.error) throw resultado.error;
+      return resultado.data ?? [];
+    });
 
     const ultimoPrecioPorTienda = new Map<string, PrecioDb>();
     for (const precio of (datosPrecios ?? []) as unknown as PrecioDb[]) {
@@ -637,10 +662,7 @@ export async function GET(request: Request) {
       } satisfies CoberturaBusqueda,
     });
   } catch (error) {
-    console.error(
-      "Error al buscar productos:",
-      error instanceof Error ? error.message : "Error desconocido",
-    );
+    console.error("Error al buscar productos:", error);
     return Response.json(
       { ok: false, error: "No se pudieron consultar los productos" },
       { status: 500 },
