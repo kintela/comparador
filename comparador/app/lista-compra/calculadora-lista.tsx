@@ -758,7 +758,7 @@ export function CalculadoraLista() {
                     )}
                   </div>
                 </div>
-                <div className="flex min-w-0 items-center justify-end gap-2 pl-12">
+                <div className="flex w-full min-w-0 items-center justify-between gap-1 sm:justify-end sm:gap-2 sm:pl-12">
                   <div className="flex shrink-0 items-center rounded-lg border border-[#17352b]/10 bg-white">
                     <button
                       type="button"
