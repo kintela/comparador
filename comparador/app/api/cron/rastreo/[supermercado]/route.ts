@@ -386,6 +386,7 @@ async function ejecutarRastreo(
         consultas,
         errores: filtrarErroresReales(resultado.errores),
         tipoRastreo,
+        identificadoresPorConsulta: resultado.identificadoresPorConsulta,
       });
       const procesadas = await guardarResultadosSolicitudes(
         supermercado,

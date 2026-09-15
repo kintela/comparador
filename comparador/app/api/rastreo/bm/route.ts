@@ -77,6 +77,7 @@ export async function POST(request: Request) {
           productos: resultado.productos,
           consultas,
           errores: resultado.errores,
+          identificadoresPorConsulta: resultado.identificadoresPorConsulta,
         })
       : null;
 
