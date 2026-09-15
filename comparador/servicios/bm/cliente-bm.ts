@@ -10,6 +10,13 @@ import type {
 
 const ENDPOINT_BM =
   "https://www.online.bmsupermercados.es/api/rest/V1.0/catalog/product";
+const ENDPOINT_SEMANTICA_BM =
+  "https://www.online.bmsupermercados.es/api/rest/V1.0/catalog/searcher/semantics";
+const CABECERAS_BM = {
+  Accept: "application/json",
+  "Accept-Language": "es-ES,es;q=0.9",
+  "User-Agent": "ComparadorPrecios/0.1 (rastreador de precios)",
+};
 
 function numeroValido(valor: number | undefined): number | null {
   return typeof valor === "number" && Number.isFinite(valor) ? valor : null;
@@ -87,11 +94,7 @@ export async function rastrearProductosBm({
 
   const respuesta = await fetch(url, {
     cache: "no-store",
-    headers: {
-      Accept: "application/json",
-      "Accept-Language": "es-ES,es;q=0.9",
-      "User-Agent": "ComparadorPrecios/0.1 (rastreador de precios)",
-    },
+    headers: CABECERAS_BM,
     signal: AbortSignal.timeout(15_000),
   });
 
@@ -109,4 +112,40 @@ export async function rastrearProductosBm({
     hayMas: datos.hasMore,
     productos,
   };
+}
+
+export async function obtenerSugerenciasBusquedaBm(
+  consulta: string,
+  limite = 5,
+): Promise<string[]> {
+  const url = new URL(ENDPOINT_SEMANTICA_BM);
+  url.searchParams.set("q", consulta);
+  url.searchParams.set("limit", String(limite));
+
+  const respuesta = await fetch(url, {
+    cache: "no-store",
+    headers: CABECERAS_BM,
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!respuesta.ok) {
+    throw new Error(
+      `BM respondió con estado ${respuesta.status} al buscar alternativas`,
+    );
+  }
+
+  const datos = (await respuesta.json()) as Array<{ query?: unknown }>;
+  const consultaNormalizada = consulta.trim().toLocaleLowerCase("es");
+  return [
+    ...new Set(
+      (Array.isArray(datos) ? datos : [])
+        .map((sugerencia) =>
+          typeof sugerencia.query === "string" ? sugerencia.query.trim() : "",
+        )
+        .filter(
+          (sugerencia) =>
+            sugerencia.length >= 2 &&
+            sugerencia.toLocaleLowerCase("es") !== consultaNormalizada,
+        ),
+    ),
+  ].slice(0, Math.min(Math.max(limite, 1), 10));
 }

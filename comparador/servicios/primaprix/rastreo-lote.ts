@@ -1,5 +1,8 @@
 import "server-only";
 
+import { obtenerVariantesSemanticas } from "@/servicios/busqueda/variantes-semanticas";
+import { normalizarTerminoRastreo } from "@/servicios/rastreo/terminos";
+
 import {
   buscarEnCatalogoPrimaprix,
   buscarEnWebPrimaprix,
@@ -34,33 +37,56 @@ export async function rastrearLotePrimaprix({
 
   for (const consulta of consultas) {
     if (productos.size >= maxProductos) break;
-    let encontrados = buscarEnCatalogoPrimaprix({
-      catalogo: catalogo.productos,
+    const consultasEquivalentes = [
       consulta,
-      limite: Math.min(
-        resultadosPorConsulta,
-        maxProductos - productos.size,
-      ),
-    });
-    if (encontrados.length === 0) {
-      try {
-        const resultadoWeb = await buscarEnWebPrimaprix({
-          consulta,
-          limite: Math.min(
-            resultadosPorConsulta,
-            maxProductos - productos.size,
-          ),
-        });
-        peticionesRealizadas += resultadoWeb.peticionesRealizadas;
-        encontrados = resultadoWeb.productos;
-      } catch (error) {
-        errores.push({
-          consulta,
-          pagina: 1,
-          mensaje:
-            error instanceof Error ? error.message : "Error desconocido",
-        });
+      ...obtenerVariantesSemanticas(normalizarTerminoRastreo(consulta)),
+    ];
+    const encontradosPorId = new Map<string, ProductoPrimaprix>();
+
+    for (const consultaEquivalente of consultasEquivalentes) {
+      const limiteRestante = Math.min(
+        resultadosPorConsulta - encontradosPorId.size,
+        maxProductos - productos.size - encontradosPorId.size,
+      );
+      if (limiteRestante <= 0) break;
+
+      for (const producto of buscarEnCatalogoPrimaprix({
+        catalogo: catalogo.productos,
+        consulta: consultaEquivalente,
+        limite: limiteRestante,
+      })) {
+        encontradosPorId.set(producto.identificadorExterno, producto);
       }
+    }
+
+    let encontrados = [...encontradosPorId.values()];
+    if (encontrados.length === 0) {
+      for (const consultaEquivalente of consultasEquivalentes) {
+        const limiteRestante = Math.min(
+          resultadosPorConsulta - encontradosPorId.size,
+          maxProductos - productos.size - encontradosPorId.size,
+        );
+        if (limiteRestante <= 0) break;
+
+        try {
+          const resultadoWeb = await buscarEnWebPrimaprix({
+            consulta: consultaEquivalente,
+            limite: limiteRestante,
+          });
+          peticionesRealizadas += resultadoWeb.peticionesRealizadas;
+          for (const producto of resultadoWeb.productos) {
+            encontradosPorId.set(producto.identificadorExterno, producto);
+          }
+        } catch (error) {
+          errores.push({
+            consulta: consultaEquivalente,
+            pagina: 1,
+            mensaje:
+              error instanceof Error ? error.message : "Error desconocido",
+          });
+        }
+      }
+      encontrados = [...encontradosPorId.values()];
     }
     encontradosPorConsulta[consulta] = encontrados.length;
     for (const producto of encontrados) {

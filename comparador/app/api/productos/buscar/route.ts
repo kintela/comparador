@@ -5,6 +5,7 @@ import {
 } from "@/servicios/solicitudes-rastreo/cobertura";
 import { puntuacionRelevanciaProducto } from "@/servicios/busqueda/relevancia-producto";
 import { resolverTerminoRastreo } from "@/servicios/rastreo/resolucion-terminos";
+import { normalizarTerminoRastreo } from "@/servicios/rastreo/terminos";
 import { obtenerSupabaseServidor } from "@/servicios/supabase/servidor";
 
 export const runtime = "nodejs";
@@ -14,10 +15,12 @@ type ProductoSupermercadoDb = {
   id: string;
   producto_id: string | null;
   nombre_original: string;
+  marca_original: string | null;
   categoria_original: string | null;
   codigo_ean: string | null;
   url_imagen: string | null;
   url_producto: string | null;
+  activo: boolean;
   productos: {
     nombre: string;
     marcas: { nombre: string } | null;
@@ -169,7 +172,7 @@ export async function GET(request: Request) {
       ? await resolverTerminoRastreo(consulta)
       : null;
     const seleccionProductos =
-      "id, producto_id, nombre_original, categoria_original, codigo_ean, url_imagen, url_producto, productos(nombre, marcas(nombre), categorias(nombre)), cadenas_supermercados(nombre)";
+      "id, producto_id, nombre_original, marca_original, categoria_original, codigo_ean, url_imagen, url_producto, activo, productos(nombre, marcas(nombre), categorias(nombre)), cadenas_supermercados(nombre)";
 
     let idsConPromocion: string[] | null = null;
     if (soloOfertas && !consulta) {
@@ -221,11 +224,16 @@ export async function GET(request: Request) {
       }
     }
 
-    function crearConsultaProductos(idsFiltro = idsCadenas) {
+    function crearConsultaProductos(
+      idsFiltro = idsCadenas,
+      soloActivos = true,
+    ) {
       let consultaProductos = supabase
         .from("productos_supermercado")
-        .select(seleccionProductos)
-        .eq("activo", true);
+        .select(seleccionProductos);
+      if (soloActivos) {
+        consultaProductos = consultaProductos.eq("activo", true);
+      }
       if (idsFiltro) {
         consultaProductos = consultaProductos.in(
           "cadena_supermercado_id",
@@ -238,10 +246,11 @@ export async function GET(request: Request) {
     async function consultarProductosPorIds(
       idsProductos: string[],
       idsFiltro = idsCadenas,
+      soloActivos = true,
     ) {
       const resultados = await Promise.all(
         dividirEnLotes(idsProductos).map((idsLote) =>
-          crearConsultaProductos(idsFiltro).in("id", idsLote),
+          crearConsultaProductos(idsFiltro, soloActivos).in("id", idsLote),
         ),
       );
       return resultados.flatMap((resultado) => {
@@ -254,22 +263,73 @@ export async function GET(request: Request) {
       variante,
       cadenas,
       limiteRpc,
+      historicos = false,
     }: {
       variante: string;
       cadenas: string[] | null;
       limiteRpc: number;
+      historicos?: boolean;
     }) {
       async function consultar(texto: string, limiteConsulta = limiteRpc) {
-        const { data: coincidencias, error: errorCoincidencias } =
-          await supabase.rpc("buscar_ids_productos_supermercado", {
-            p_consulta: texto,
-            p_cadenas: cadenas,
-            p_limite: limiteConsulta,
-          });
+        if (historicos) {
+          const textoFiltro = texto.replace(/[,%()]/g, " ").trim();
+          if (!textoFiltro) return [];
+          const desde = new Date();
+          desde.setDate(desde.getDate() - 180);
+          let consultaHistoricos = supabase
+            .from("productos_supermercado")
+            .select("id")
+            .eq("activo", false)
+            .gte("fecha_ultima_deteccion", desde.toISOString())
+            .or(
+              `nombre_original.ilike.%${textoFiltro}%,marca_original.ilike.%${textoFiltro}%`,
+            )
+            .order("fecha_ultima_deteccion", { ascending: false })
+            .limit(Math.min(limiteConsulta, 100));
+          if (cadenas && cadenas.length > 0) {
+            consultaHistoricos = consultaHistoricos.in(
+              "cadena_supermercado_id",
+              cadenas,
+            );
+          }
+          const { data, error } = await consultaHistoricos;
+          if (error) throw error;
+          return (data ?? []).map((item) => item.id);
+        }
+
+        const [{ data: coincidencias, error: errorCoincidencias }, porMarca] =
+          await Promise.all([
+            supabase.rpc("buscar_ids_productos_supermercado", {
+              p_consulta: texto,
+              p_cadenas: cadenas,
+              p_limite: limiteConsulta,
+            }),
+            (() => {
+              let consultaMarca = supabase
+                .from("productos_supermercado")
+                .select("id")
+                .eq("activo", true)
+                .ilike("marca_original", `%${texto}%`)
+                .limit(limiteConsulta);
+              if (cadenas && cadenas.length > 0) {
+                consultaMarca = consultaMarca.in(
+                  "cadena_supermercado_id",
+                  cadenas,
+                );
+              }
+              return consultaMarca;
+            })(),
+          ]);
         if (errorCoincidencias) throw errorCoincidencias;
-        return ((coincidencias ?? []) as IdProductoSupermercadoRpc[]).map(
-          (item) => item.producto_supermercado_id,
-        );
+        if (porMarca.error) throw porMarca.error;
+        return [
+          ...new Set([
+            ...((coincidencias ?? []) as IdProductoSupermercadoRpc[]).map(
+              (item) => item.producto_supermercado_id,
+            ),
+            ...(porMarca.data ?? []).map((item) => item.id),
+          ]),
+        ].slice(0, limiteConsulta);
       }
 
       const idsFrase = await consultar(variante);
@@ -304,9 +364,54 @@ export async function GET(request: Request) {
     }
 
     let data: unknown[] = [];
+    const idsCoincidenciaOrigen = new Set<string>();
     if (consulta) {
       const productosPorId = new Map<string, unknown>();
-      for (const variante of terminoResuelto?.variantesBusqueda ?? [consulta]) {
+      const variantesBusqueda = terminoResuelto?.variantesBusqueda ?? [consulta];
+      if (!soloOfertas) {
+        const desdeCoincidenciasOrigen = new Date();
+        desdeCoincidenciasOrigen.setDate(
+          desdeCoincidenciasOrigen.getDate() - 30,
+        );
+        const terminosOrigen = [
+          ...new Set(
+            variantesBusqueda
+              .map(normalizarTerminoRastreo)
+              .filter(Boolean),
+          ),
+        ];
+        const { data: coincidenciasOrigen, error: errorCoincidenciasOrigen } =
+          await supabase
+            .from("productos_supermercado_busquedas")
+            .select("producto_supermercado_id")
+            .in("termino_normalizado", terminosOrigen)
+            .gte(
+              "fecha_ultima_coincidencia",
+              desdeCoincidenciasOrigen.toISOString(),
+            )
+            .order("fecha_ultima_coincidencia", { ascending: false })
+            .limit(500);
+        if (
+          errorCoincidenciasOrigen &&
+          errorCoincidenciasOrigen.code !== "42P01" &&
+          !/schema cache|does not exist/i.test(errorCoincidenciasOrigen.message)
+        ) {
+          throw errorCoincidenciasOrigen;
+        }
+        for (const coincidencia of coincidenciasOrigen ?? []) {
+          idsCoincidenciaOrigen.add(coincidencia.producto_supermercado_id);
+        }
+        if (idsCoincidenciaOrigen.size > 0) {
+          const productosOrigen = await consultarProductosPorIds(
+            [...idsCoincidenciaOrigen],
+          );
+          for (const producto of productosOrigen as Array<{ id: string }>) {
+            productosPorId.set(producto.id, producto);
+          }
+        }
+      }
+
+      for (const variante of variantesBusqueda) {
         const idsCoincidentes = await buscarIdsCoincidentes({
           variante,
           cadenas: idsCadenas,
@@ -315,12 +420,32 @@ export async function GET(request: Request) {
             Math.max(120, limite * Math.max(idsCadenas?.length ?? 1, 1)),
           ),
         });
-        if (idsCoincidentes.length === 0) continue;
-        const productosCoincidentes = await consultarProductosPorIds(
-          idsCoincidentes,
-        );
-        for (const producto of productosCoincidentes as Array<{ id: string }>) {
-          productosPorId.set(producto.id, producto);
+        if (idsCoincidentes.length > 0) {
+          const productosCoincidentes = await consultarProductosPorIds(
+            idsCoincidentes,
+          );
+          for (const producto of productosCoincidentes as Array<{ id: string }>) {
+            productosPorId.set(producto.id, producto);
+          }
+        }
+
+        if (!soloOfertas) {
+          const idsHistoricos = await buscarIdsCoincidentes({
+            variante,
+            cadenas: idsCadenas,
+            limiteRpc: Math.min(100, Math.max(40, limite)),
+            historicos: true,
+          });
+          if (idsHistoricos.length > 0) {
+            const productosHistoricos = await consultarProductosPorIds(
+              idsHistoricos,
+              idsCadenas,
+              false,
+            );
+            for (const producto of productosHistoricos as Array<{ id: string }>) {
+              productosPorId.set(producto.id, producto);
+            }
+          }
         }
       }
       data = [...productosPorId.values()];
@@ -389,6 +514,11 @@ export async function GET(request: Request) {
         terminoNormalizado: terminoResuelto?.normalizado,
       });
     }
+    const clavesCoincidenciaOrigen = new Set(
+      productosSupermercado
+        .filter((producto) => idsCoincidenciaOrigen.has(producto.id))
+        .map((producto) => producto.producto_id ?? producto.id),
+    );
 
     const ids = productosSupermercado.map((producto) => producto.id);
     const resultadosPrecios = await Promise.all(
@@ -498,13 +628,16 @@ export async function GET(request: Request) {
           unidadReferencia: precio.unidad_referencia,
           textoPromocion: promocionVigente ? precio.texto_promocion : null,
           enOferta: promocionVigente,
-          disponible: precio.disponible,
+          disponible: precio.disponible && producto.activo,
           fechaObtencion: precio.fecha_obtencion,
           urlProducto: producto.url_producto,
         });
       }
 
-      agrupado.ofertas.sort((a, b) => a.precio - b.precio);
+      agrupado.ofertas.sort(
+        (a, b) =>
+          Number(b.disponible) - Number(a.disponible) || a.precio - b.precio,
+      );
       agrupados.set(claveProducto, agrupado);
     }
 
@@ -516,16 +649,23 @@ export async function GET(request: Request) {
       .filter(
         (producto) =>
           !consulta ||
+          clavesCoincidenciaOrigen.has(producto.id) ||
           puntuacionRelevanciaProducto(
-            producto.nombre,
+            `${producto.marca ?? ""} ${producto.nombre}`,
             terminoResuelto?.termino ?? consulta,
           ) > 0,
       )
       .sort((a, b) => {
         const termino = terminoResuelto?.termino ?? consulta;
         const diferenciaRelevancia =
-          puntuacionRelevanciaProducto(b.nombre, termino) -
-          puntuacionRelevanciaProducto(a.nombre, termino);
+          puntuacionRelevanciaProducto(
+            `${b.marca ?? ""} ${b.nombre}`,
+            termino,
+          ) -
+          puntuacionRelevanciaProducto(
+            `${a.marca ?? ""} ${a.nombre}`,
+            termino,
+          );
         return (
           diferenciaRelevancia ||
           (a.ofertas[0]?.precio ?? Infinity) -

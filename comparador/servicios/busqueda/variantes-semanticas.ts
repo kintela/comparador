@@ -20,6 +20,10 @@ const VARIANTES_POR_TERMINO: Record<string, string[]> = {
   "huevo campero": ["huevos camperos", "huevos camperas"],
   "huevos camperos": ["huevo campero", "huevos camperas"],
   "huevos camperas": ["huevo campero", "huevos camperos"],
+  "pasta fresca rellena": ["ravioli", "tortellini", "mezzelune"],
+  "pasta rellena": ["ravioli", "tortellini", "mezzelune"],
+  "tostada melba": ["tostadas de canapes", "pan tostado"],
+  "tostadas melba": ["tostadas de canapes", "pan tostado"],
 };
 
 const VARIANTES_POR_PALABRA: Record<string, string[]> = {
@@ -27,6 +31,9 @@ const VARIANTES_POR_PALABRA: Record<string, string[]> = {
   mandarinas: ["clementina", "clementinas"],
   clementina: ["mandarina", "mandarinas"],
   clementinas: ["mandarina", "mandarinas"],
+  melba: ["canapes"],
+  mexxelune: ["mezzelune"],
+  recindo: ["recondo"],
 };
 
 function singularizar(termino: string) {

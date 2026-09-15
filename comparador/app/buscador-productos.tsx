@@ -83,7 +83,9 @@ const COMPARADOR_TEXTO = new Intl.Collator("es", {
 });
 
 function obtenerOfertaMasBarata(producto: Producto) {
-  return producto.ofertas.reduce<Oferta | null>(
+  const disponibles = producto.ofertas.filter((oferta) => oferta.disponible);
+  const candidatas = disponibles.length > 0 ? disponibles : producto.ofertas;
+  return candidatas.reduce<Oferta | null>(
     (masBarata, oferta) =>
       !masBarata || oferta.precio < masBarata.precio ? oferta : masBarata,
     null,
@@ -155,8 +157,8 @@ export function BuscadorProductos() {
 
     const termino = resultado?.consulta ?? consulta;
     const diferenciaRelevancia =
-      puntuacionRelevanciaProducto(b.nombre, termino) -
-      puntuacionRelevanciaProducto(a.nombre, termino);
+      puntuacionRelevanciaProducto(`${b.marca ?? ""} ${b.nombre}`, termino) -
+      puntuacionRelevanciaProducto(`${a.marca ?? ""} ${a.nombre}`, termino);
     return diferenciaRelevancia || precioA - precioB;
   });
 
@@ -471,7 +473,10 @@ function ProductoCard({
   producto: Producto;
   compacta?: boolean;
 }) {
-  const ofertas = [...producto.ofertas].sort((a, b) => a.precio - b.precio);
+  const ofertas = [...producto.ofertas].sort(
+    (a, b) =>
+      Number(b.disponible) - Number(a.disponible) || a.precio - b.precio,
+  );
   const eanImagenCarrefour = obtenerEanImagenCarrefour(producto.imagen);
 
   return (
@@ -547,7 +552,12 @@ function ProductoCard({
                     Oferta
                   </span>
                 )}
-                {indice === 0 && ofertas.length > 1 && (
+                {!oferta.disponible && (
+                  <span className="rounded-full bg-[#ece9e1] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#60766e]">
+                    Último precio conocido
+                  </span>
+                )}
+                {indice === 0 && oferta.disponible && ofertas.length > 1 && (
                   <span className="rounded-full bg-[#dff3e9] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#176b50]">
                     Mejor precio
                   </span>
@@ -557,6 +567,12 @@ function ProductoCard({
                 {oferta.tienda}
                 {oferta.municipio ? ` · ${oferta.municipio}` : ""}
               </p>
+              {!oferta.disponible && (
+                <p className="mt-1 text-xs text-[#71837c]">
+                  Visto por última vez el{" "}
+                  {new Date(oferta.fechaObtencion).toLocaleDateString("es-ES")}
+                </p>
+              )}
               {oferta.textoPromocion && (
                 <p className="mt-1 text-xs font-semibold text-[#b06d00]">
                   {oferta.textoPromocion}

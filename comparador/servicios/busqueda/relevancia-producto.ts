@@ -133,7 +133,7 @@ export function puntuacionRelevanciaProducto(
     /\brellen[oa]s?\b/.test(consultaNormalizada);
   const nombreEsPastaRellena =
     /\bpastas?\b.*\brellen[oa]s?\b/.test(nombre) ||
-    /\b(raviolis?|tortellos?|tortellinis?|tortellonis?|cappellettis?|agnolottis?|panzerottis?|mezzelunas?|medialunas?|girasolis?|girasoles)\b/.test(
+    /\b(raviolis?|tortellos?|tortellinis?|tortellonis?|cappellettis?|agnolottis?|panzerottis?|mezzelun[ae]s?|medialunas?|girasolis?|girasoles)\b/.test(
       nombre,
     );
   const consultaEsRopaOscura = /\boscur[oa]s?\b/.test(consultaNormalizada);

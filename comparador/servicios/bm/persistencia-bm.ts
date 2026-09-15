@@ -2,6 +2,7 @@ import "server-only";
 
 import { crearSlug } from "@/servicios/eroski/categorias-eroski";
 import type { TipoRastreo } from "@/servicios/rastreo/configuracion";
+import { normalizarTerminoRastreo } from "@/servicios/rastreo/terminos";
 import {
   revertirAltasSinPrecio,
   tienePrecioUtil,
@@ -338,11 +339,13 @@ export async function guardarRastreoBm({
   consultas,
   errores,
   tipoRastreo = "manual",
+  identificadoresPorConsulta,
 }: {
   productos: ProductoBm[];
   consultas: string[];
   errores: ErrorRastreoCatalogo[];
   tipoRastreo?: TipoRastreo;
+  identificadoresPorConsulta?: Record<string, string[]>;
 },
 configuracion: ConfiguracionPersistenciaCatalogo = CONFIGURACION_BM,
 ): Promise<ResumenPersistenciaBm> {
@@ -551,6 +554,36 @@ configuracion: ConfiguracionPersistenciaCatalogo = CONFIGURACION_BM,
         producto.id,
       ]),
     );
+    const coincidenciasBusqueda = Object.entries(
+      identificadoresPorConsulta ?? {},
+    ).flatMap(([consulta, codigos]) => {
+      const terminoNormalizado = normalizarTerminoRastreo(consulta);
+      if (!terminoNormalizado) return [];
+      return [...new Set(codigos)].flatMap((codigo) => {
+        const productoSupermercadoId = idSupermercadoPorCodigo.get(codigo);
+        return productoSupermercadoId
+          ? [{
+              producto_supermercado_id: productoSupermercadoId,
+              termino_normalizado: terminoNormalizado,
+              fecha_ultima_coincidencia: ahora,
+            }]
+          : [];
+      });
+    });
+    if (coincidenciasBusqueda.length > 0) {
+      const { error: errorCoincidencias } = await supabase
+        .from("productos_supermercado_busquedas")
+        .upsert(coincidenciasBusqueda, {
+          onConflict: "producto_supermercado_id,termino_normalizado",
+        });
+      if (
+        errorCoincidencias &&
+        errorCoincidencias.code !== "42P01" &&
+        !/schema cache|does not exist/i.test(errorCoincidencias.message)
+      ) {
+        throw errorCoincidencias;
+      }
+    }
     const precios = productos.flatMap((producto) => {
       const productoSupermercadoId = idSupermercadoPorCodigo.get(
         producto.identificadorExterno,
